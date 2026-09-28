@@ -19,3 +19,11 @@ Specific code file:
 ```bash  
 kaggle competitions download -c gemma-4-developer-agent -f HARNESS_README.md
 ```
+
+Kaggle dataset:
+```bash
+kaggle datasets init
+# After editing metadata:
+kaggle datasets create -p .
+kaggle datasets version -p . -m "tag version / details"
+```
