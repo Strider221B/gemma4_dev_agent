@@ -6,46 +6,62 @@
 
 ```mermaid
 flowchart TB
-    subgraph DATA_LAYER["Data Layer"]
-        direction LR
-        RAW["tasks.jsonl\n+ snapshots/\n+ graphs/\n+ embeddings/"]
-        INGEST["DataIngestor"]
-        TRAJ["TrajectorySynthesiser"]
-        FMT["ChatFormatter"]
-        DS["HF Dataset\n(train/val splits)"]
-        RAW --> INGEST --> TRAJ --> FMT --> DS
+    subgraph LOCAL["Local Machine"]
+        direction TB
+        SRC["src/ Python Package\n+ configs/ + notebooks/"]
+        MOCK["Mock Sandbox\n(structural tests)"]
+        STAGE["kaggle_staging/\n(dataset-metadata.json)"]
+        SRC --> STAGE
+        MOCK -.->|"smoke tests"| SRC
     end
 
-    subgraph TRAIN_LAYER["Training Layer (Kaggle 4×L4)"]
-        direction LR
-        SFT["SFTTrainer\n(Unsloth QLoRA)"]
-        RL["RLTrainer\n(GRPO/DPO)"]
-        CKPT["Checkpoint Manager\n(safetensors)"]
-        DS --> SFT
-        SFT -->|"sft_lora"| RL
-        SFT -->|"sft_lora"| CKPT
-        RL -->|"rl_lora"| CKPT
+    subgraph UPLOAD["Dataset Upload"]
+        VER["VersionManager\nvX.Y.Z"]
+        STAGE -->|"kaggle datasets version"| VER
+        VER -->|"Kaggle API"| DS_REMOTE["Kaggle Dataset\nsomeshchatterjee/\ngemma4-dev-agent-code"]
     end
 
-    subgraph EVAL_LAYER["Evaluation Layer"]
-        direction LR
-        CV["CVEvaluator\nGroup K-Fold"]
-        MOCK["MockSandbox\n(2-file workspace)"]
-        PEER["PeerAnalyser"]
-        CKPT --> CV
-        CV -->|"resolution metrics"| TELEM["TelemetryLogger"]
-        MOCK -.->|"structural smoke tests"| CV
-        PEER -->|"adversarial scores"| CV
-    end
+    subgraph KAGGLE["Kaggle Notebook (4×L4 GPUs)"]
+        direction TB
+        NB["train_notebook.ipynb"]
+        DS_REMOTE -->|"pip install -e\n/kaggle/input/.../src"| NB
 
-    subgraph DEPLOY_LAYER["Deployment Layer"]
-        direction LR
-        PKG["SubmissionPackager"]
-        VER["VersionManager"]
-        STAGE["kaggle_staging/"]
-        CKPT --> PKG
-        PKG -->|"validate + zip"| STAGE
-        VER -->|"kaggle datasets version"| PUSH["Kaggle API"]
+        subgraph DATA_LAYER["Data Layer"]
+            direction LR
+            RAW["tasks.jsonl\n+ snapshots/\n+ graphs/\n+ embeddings/"]
+            INGEST["DataIngestor"]
+            TRAJ["TrajectorySynthesiser"]
+            FMT["ChatFormatter"]
+            HF_DS["HF Dataset\n(train/val splits)"]
+            RAW --> INGEST --> TRAJ --> FMT --> HF_DS
+        end
+
+        subgraph TRAIN_LAYER["Training Layer"]
+            direction LR
+            SFT["SFTTrainer\n(Unsloth QLoRA)"]
+            RL["RLTrainer\n(GRPO/DPO)"]
+            CKPT["Checkpoint Manager\n(safetensors)"]
+            HF_DS --> SFT
+            SFT -->|"sft_lora"| RL
+            SFT -->|"sft_lora"| CKPT
+            RL -->|"rl_lora"| CKPT
+        end
+
+        subgraph EVAL_LAYER["Evaluation Layer"]
+            direction LR
+            CV["CVEvaluator\nGroup K-Fold"]
+            PEER["PeerAnalyser"]
+            CKPT --> CV
+            CV -->|"resolution metrics"| TELEM["TelemetryLogger"]
+            PEER -->|"adversarial scores"| CV
+        end
+
+        subgraph PACKAGE_LAYER["Packaging Layer"]
+            direction LR
+            PKG["SubmissionPackager"]
+            CKPT --> PKG
+            PKG -->|"validate + zip"| SUB_ZIP["/kaggle/working/\nsubmission.zip"]
+        end
     end
 
     subgraph RUNTIME["Competition Runtime"]
@@ -61,7 +77,7 @@ flowchart TB
         TOOLS <-->|"docker exec"| WS
     end
 
-    STAGE --> YAML
+    SUB_ZIP -->|"evaluated by harness"| YAML
 ```
 
 ---
@@ -158,26 +174,24 @@ gemma4_dev_agent/
 │   ├── train_notebook.ipynb              # Kaggle execution notebook (imports from src/)
 │   └── exploration.ipynb                 # EDA / trajectory inspection
 │
-├── kaggle_staging/                       # Deployment output directory
-│   ├── dataset-metadata.json             # Kaggle dataset metadata
-│   ├── agent.yaml                        # Root compiled agent tree schema
-│   ├── eval_config.yaml                  # Per-task execution budget overrides
-│   ├── prompts/
-│   │   ├── system.md                     # System instruction for root coder agent
-│   │   ├── navigator.md                  # Instruction for code navigator sub-agent
-│   │   └── patch_guidelines.md           # Patch formatting best practices
-│   ├── sub_agents/
-│   │   └── code_analyzer.yaml            # Read-only analysis AgentTool
-│   ├── adapters/
-│   │   ├── coder_lora/
-│   │   │   ├── adapter_config.json
-│   │   │   └── adapter_model.safetensors
-│   │   └── navigator_lora/
-│   │       ├── adapter_config.json
-│   │       └── adapter_model.safetensors
-│   └── skills/
-│       └── repo_navigation/
-│           └── SKILL.md
+├── kaggle_staging/                       # Source code dataset — uploaded to Kaggle via API
+│   ├── dataset-metadata.json             # Kaggle dataset metadata (id, title, licenses)
+│   ├── src/                              # Symlink or copy of src/ for dataset upload
+│   ├── configs/                          # Training & eval config YAMLs
+│   ├── notebooks/                        # Kaggle execution notebooks
+│   ├── submission_templates/             # Agent YAML + prompt templates (bundled into submission.zip on Kaggle)
+│   │   ├── agent.yaml                    # Root compiled agent tree schema
+│   │   ├── eval_config.yaml              # Per-task execution budget overrides
+│   │   ├── prompts/
+│   │   │   ├── system.md                 # System instruction for root coder agent
+│   │   │   ├── navigator.md              # Instruction for code navigator sub-agent
+│   │   │   └── patch_guidelines.md       # Patch formatting best practices
+│   │   ├── sub_agents/
+│   │   │   └── code_analyzer.yaml        # Read-only analysis AgentTool
+│   │   └── skills/
+│   │       └── repo_navigation/
+│   │           └── SKILL.md
+│   └── VERSION                           # Semantic version file for dataset tagging
 │
 ├── documentation/
 │   ├── competition_details/              # Raw Kaggle competition pages
@@ -250,11 +264,17 @@ gemma4_dev_agent/
 - **Key Contract**: Local CV score must correlate with public LB within ±0.10 tolerance
 
 ### 3.4 Deployment Layer (`src/deployment/`)
-- **Input**: Best adapter checkpoints + prompt templates + agent YAML configs
-- **Output**: Validated `submission.zip` < 3 GiB
-- **Key Contract**: Pre-flight validation catches every constraint violation before Kaggle push
+- **Input**: Source code package (`src/`), configs, submission templates, trained adapter checkpoints
+- **Output (Local)**: Validated `kaggle_staging/` directory pushed as a Kaggle dataset via `kaggle datasets version`
+- **Output (On Kaggle)**: `submission.zip` < 3 GiB assembled by the notebook at `/kaggle/working/` using trained adapters + templates
+- **Key Contract**: Pre-flight validation catches every constraint violation before Kaggle push; the notebook is the final assembly point for `submission.zip`
 
-### 3.5 Runtime (Competition Evaluation)
-- **Input**: `submission.zip` uploaded as Kaggle dataset
+### 3.5 Data Flow: Local → Kaggle → Evaluation
+1. **Local**: `src/` + `configs/` + `submission_templates/` staged into `kaggle_staging/` → uploaded as Kaggle dataset
+2. **Kaggle Notebook**: Imports dataset → `pip install -e` the `src/` package → runs training → saves adapters → copies templates + adapters into `/kaggle/working/submission/` → zips as `submission.zip`
+3. **Evaluation Harness**: Loads `submission.zip` → compiles `agent.yaml` → runs inference → produces `submission.parquet`
+
+### 3.6 Runtime (Competition Evaluation)
+- **Input**: `submission.zip` produced by the Kaggle notebook
 - **Output**: `submission.parquet` with `[id, prediction]` columns
 - **Key Contract**: All agent behaviour is determined by `agent.yaml` + adapters; no Python code execution on host

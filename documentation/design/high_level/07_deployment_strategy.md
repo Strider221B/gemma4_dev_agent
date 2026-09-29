@@ -6,54 +6,46 @@
 
 ```mermaid
 flowchart LR
-    subgraph BUILD["Build Phase"]
-        ADAPT["Trained Adapter\nCheckpoints"]
-        PROMPT["System Prompts\n(.md files)"]
-        YAML["Agent YAML\nConfigs"]
-        EVAL_CFG["eval_config.yaml"]
+    subgraph LOCAL["Local: Code Staging"]
+        SRC["src/ + configs/\n+ submission_templates/"]
+        VALIDATE_L["Local Validation\n(lint, types, smoke tests)"]
+        STAGE["kaggle_staging/\n+ dataset-metadata.json"]
+        SRC --> VALIDATE_L --> STAGE
     end
 
-    subgraph VALIDATE["Validation Phase"]
-        SIZE["Size Check\n< 3 GiB"]
-        FMT["Format Check\n.safetensors only"]
-        SCHEMA["Schema Check\nagent.yaml validity"]
-        SMOKE["Smoke Tests\nMock sandbox"]
-    end
-
-    subgraph PACKAGE["Package Phase"]
-        STAGE["kaggle_staging/"]
-        ZIP["submission.zip"]
-        META["dataset-metadata.json"]
-    end
-
-    subgraph PUSH["Push Phase"]
+    subgraph PUSH["Dataset Push"]
         VER["Version Tag\nvX.Y.Z"]
-        KAGGLE["kaggle datasets version\n-p . -m 'vX.Y.Z'"]
-        NB["Notebook\nreferences dataset"]
+        KAGGLE_API["kaggle datasets version\n-p kaggle_staging/"]
+        STAGE --> VER --> KAGGLE_API
     end
 
-    ADAPT --> SIZE
-    PROMPT --> FMT
-    YAML --> SCHEMA
-    SIZE --> STAGE
-    FMT --> STAGE
-    SCHEMA --> STAGE
-    SMOKE --> STAGE
-    STAGE --> ZIP
-    ZIP --> META
-    META --> VER --> KAGGLE
-    KAGGLE --> NB
+    subgraph KAGGLE_NB["Kaggle Notebook: Training + Packaging"]
+        IMPORT["pip install -e\n/kaggle/input/.../src"]
+        TRAIN["SFT → RL Training\n(produces adapters)"]
+        PKG["SubmissionPackager\n(templates + adapters)"]
+        VALIDATE_K["ConstraintValidator\n(size, format, schema)"]
+        ZIP["/kaggle/working/\nsubmission.zip"]
+        KAGGLE_API --> IMPORT --> TRAIN --> PKG --> VALIDATE_K --> ZIP
+    end
+
+    subgraph EVAL["Competition Evaluation"]
+        HARNESS["swegemma harness"]
+        SCORE["Resolution Rate"]
+        ZIP -->|"submitted"| HARNESS --> SCORE
+    end
 ```
 
 ---
 
 ## 2. Submission Packager (`SubmissionPackager`)
 
+> **Runs on Kaggle**, not locally. The notebook calls this after training to assemble `submission.zip` at `/kaggle/working/` from submission templates (uploaded via dataset) + freshly trained adapter checkpoints.
+
 ### 2.1 Assembly Process
 
 ```python
 class SubmissionPackager:
-    """Assembles and validates the final submission.zip."""
+    """Assembles submission.zip on Kaggle from templates + trained adapters."""
     
     _MAX_TOTAL_SIZE: int = 3_221_225_472  # 3 GiB
     _REQUIRED_FILES: list[str] = ["agent.yaml"]
@@ -64,35 +56,28 @@ class SubmissionPackager:
     _FORBIDDEN_EXTENSIONS: set[str] = {".bin", ".pt", ".pth", ".pkl", ".pickle"}
     
     def package(self, config: DeployConfig) -> Path:
-        staging_dir = config.staging_dir  # ./kaggle_staging/
+        output_dir = config.output_dir  # /kaggle/working/submission/
         
-        # 1. Clean staging directory (preserve dataset-metadata.json)
-        self._clean_staging(staging_dir)
+        # 1. Clean output directory
+        self._clean_output(output_dir)
         
-        # 2. Copy agent YAML configs
-        self._copy_yaml_configs(config.yaml_source, staging_dir)
+        # 2. Copy submission templates from dataset input
+        #    (agent.yaml, prompts/, sub_agents/, skills/)
+        templates_dir = config.templates_dir  # /kaggle/input/.../submission_templates/
+        self._copy_templates(templates_dir, output_dir)
         
-        # 3. Copy prompt templates
-        self._copy_prompts(config.prompt_source, staging_dir / "prompts")
-        
-        # 4. Copy sub-agent configs
-        self._copy_sub_agents(config.sub_agent_source, staging_dir / "sub_agents")
-        
-        # 5. Copy adapter checkpoints (safetensors only)
+        # 3. Copy trained adapter checkpoints into adapters/
         for adapter in config.adapters:
-            self._copy_adapter(adapter.path, staging_dir / "adapters" / adapter.name)
+            self._copy_adapter(
+                adapter.checkpoint_path,  # /kaggle/working/checkpoints/sft_lora/
+                output_dir / "adapters" / adapter.name,
+            )
         
-        # 6. Copy skills (if any)
-        self._copy_skills(config.skills_source, staging_dir / "skills")
+        # 4. Run pre-flight validation
+        self._validate(output_dir)
         
-        # 7. Copy eval_config.yaml
-        self._copy_eval_config(config.eval_config, staging_dir)
-        
-        # 8. Run pre-flight validation
-        self._validate(staging_dir)
-        
-        # 9. Create submission.zip
-        zip_path = self._create_zip(staging_dir, config.output_path)
+        # 5. Create submission.zip
+        zip_path = self._create_zip(output_dir, config.zip_path)
         
         return zip_path
 ```
@@ -244,15 +229,14 @@ class DeploymentOrchestrator:
         packager = SubmissionPackager()
         zip_path = packager.package(config)
         
-        # Gate 5: Version bump and push
+        # Gate 5: Version bump and push code dataset
         version = self._version_mgr.bump(config.bump_type, config.message)
         self._version_mgr.push(config.staging_dir, version, config.message)
         
         return DeploymentResult(
             version=version,
-            zip_path=zip_path,
+            zip_path=zip_path,  # Only meaningful when run on Kaggle
             cv_score=cv_result.resolution_rate,
-            size_bytes=zip_path.stat().st_size,
         )
 ```
 
@@ -263,51 +247,78 @@ class DeploymentOrchestrator:
 ### 4.1 Training Notebook Structure (`notebooks/train_notebook.ipynb`)
 
 ```python
-# Cell 1: Install package
+# Cell 1: Install our code package from the uploaded dataset
 !pip install -e /kaggle/input/gemma4-dev-agent-code/src
 
-# Cell 2: Import pipeline
+# Cell 2: Import pipeline modules
 from src.config.config_manager import ConfigManager
 from src.data.dataset_builder import DatasetBuilder
 from src.training.sft_trainer import SFTTrainerPipeline
 from src.training.rl_trainer import RLTrainerPipeline
 from src.deployment.submission_packager import SubmissionPackager
 
-# Cell 3: Configure
+# Cell 3: Load config from the uploaded dataset
 config = ConfigManager.load("/kaggle/input/gemma4-dev-agent-code/configs/sft_config.yaml")
 
-# Cell 4: Build dataset
+# Cell 4: Build dataset from competition data
 dataset = DatasetBuilder(config).build()
 
-# Cell 5: SFT Training
+# Cell 5: SFT Training → adapter saved to /kaggle/working/checkpoints/sft_lora/
 sft_pipeline = SFTTrainerPipeline()
 sft_adapter = sft_pipeline.run(config.sft, dataset)
 
-# Cell 6: RL Training (optional)
+# Cell 6: RL Training (optional) → adapter saved to /kaggle/working/checkpoints/rl_lora/
 rl_pipeline = RLTrainerPipeline()
 rl_adapter = rl_pipeline.run(config.rl, dataset.tasks)
 
-# Cell 7: Package submission
+# Cell 7: Assemble submission.zip from templates (in dataset) + trained adapters (in /kaggle/working/)
+# Templates come from: /kaggle/input/gemma4-dev-agent-code/submission_templates/
+# Adapters come from:  /kaggle/working/checkpoints/
 packager = SubmissionPackager()
 submission = packager.package(config.deploy)
+# Output: /kaggle/working/submission.zip
 ```
 
-### 4.2 Output Artifacts
+### 4.2 Kaggle File Layout
 
 ```
-/kaggle/working/
-├── submission.zip              # Final submission archive
-├── submission/                 # Unpacked staging directory
-│   ├── agent.yaml
+/kaggle/input/
+├── gemma4-dev-agent-code/              # OUR uploaded dataset (from kaggle_staging/)
+│   ├── src/                            # Our Python package
+│   ├── configs/                        # Training config YAMLs
+│   ├── notebooks/                      # Reference notebooks
+│   └── submission_templates/           # Agent YAML + prompts (become submission root)
+│       ├── agent.yaml
+│       ├── eval_config.yaml
+│       ├── prompts/
+│       ├── sub_agents/
+│       └── skills/
+└── gemma-4-developer-agent/            # Competition dataset (provided by Kaggle)
+    └── published/
+        ├── tasks.jsonl
+        ├── snapshots/
+        ├── graphs/
+        └── embeddings/
+
+/kaggle/working/                        # Notebook output directory
+├── checkpoints/
+│   ├── sft_lora/                       # Trained SFT adapter
+│   │   ├── adapter_config.json
+│   │   └── adapter_model.safetensors
+│   └── rl_lora/                        # Trained RL adapter
+├── submission/                         # Assembled submission directory
+│   ├── agent.yaml                      # Copied from templates
 │   ├── eval_config.yaml
 │   ├── prompts/
 │   ├── sub_agents/
-│   └── adapters/
-├── checkpoints/
-│   ├── sft_lora/               # SFT checkpoint
-│   └── rl_lora/                # RL checkpoint
+│   ├── skills/
+│   └── adapters/                       # Trained adapters copied here
+│       └── coder_lora/
+│           ├── adapter_config.json
+│           └── adapter_model.safetensors
+├── submission.zip                      # Final zipped submission
 └── logs/
-    └── run_v0.1.0.log          # Training telemetry
+    └── run_v0.1.0.log                  # Training telemetry
 ```
 
 ---
@@ -345,6 +356,7 @@ python -m src.deployment.constraint_validator --staging-dir ./kaggle_staging
 | Unit tests | `pytest tests/unit/` | 100% pass, ≥90% coverage |
 | Mock smoke tests | `pytest tests/ -k smoke` | All pass |
 | agent.yaml schema | `constraint_validator --staging-dir` | All checks pass |
-| Submission size | `du -sb kaggle_staging/` | < 3,221,225,472 bytes |
-| Adapter format | Check `*.safetensors` exists | No `.bin`/`.pt` files |
-| Single model | Parse all YAML | One model declared |
+| Submission size | `du -sb kaggle_staging/` | Reasonable for dataset upload |
+| Templates valid | Check `submission_templates/agent.yaml` exists | Schema correct |
+| Adapter format | Check `*.safetensors` in checkpoints | No `.bin`/`.pt` files |
+| Single model | Parse all YAML in templates | One model declared |

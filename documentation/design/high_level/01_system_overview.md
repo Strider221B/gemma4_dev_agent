@@ -38,17 +38,23 @@ The agent is deployed as a **declarative YAML tree** (`agent.yaml`) compiled by 
 ```mermaid
 flowchart LR
     subgraph LOCAL["Local Machine (Low Spec)"]
-        SRC["src/ Python Package"]
+        SRC["src/ Python Package\n+ configs/ + templates/"]
         MOCK["Mock Sandbox\n(2-file dummy workspace)"]
         LINT["Linter + Format Validator"]
+        STAGE["kaggle_staging/\n(dataset upload)"]
+        SRC --> STAGE
+        MOCK -.->|"structural tests"| SRC
+        LINT -.->|"pre-commit"| SRC
     end
+
+    STAGE -->|"kaggle datasets\nversion -p ."| DATASET["Kaggle Dataset\n(our code)"]
 
     subgraph KAGGLE["Kaggle Notebook (4×L4 GPUs)"]
         NB["train_notebook.ipynb"]
-        VLLM["vLLM Server\n(tensor_parallel=4)"]
         SFT["SFT Trainer\n(Unsloth + TRL)"]
         RL["RL Trainer\n(GRPO / DPO)"]
         PKG["Submission Packager"]
+        SUB["/kaggle/working/\nsubmission.zip"]
     end
 
     subgraph EVAL["Evaluation Harness"]
@@ -57,18 +63,16 @@ flowchart LR
         CONT_B["Container B\nVerification Sandbox"]
     end
 
-    SRC -->|"pip install -e ."| NB
+    DATASET -->|"pip install -e\n/kaggle/input/.../src"| NB
     NB --> SFT
     NB --> RL
     SFT -->|"adapter_model.safetensors"| PKG
     RL -->|"adapter_model.safetensors"| PKG
-    PKG -->|"submission.zip"| COMP
+    PKG -->|"templates + adapters"| SUB
+    SUB -->|"evaluated"| COMP
     COMP --> CONT_A
     CONT_A -->|"git diff"| CONT_B
     CONT_B -->|"pytest exit_code"| SCORE["Resolution Rate"]
-
-    MOCK -.->|"structural tests"| SRC
-    LINT -.->|"pre-commit"| SRC
 ```
 
 ---
@@ -85,8 +89,8 @@ flowchart LR
 | **Reward Model** | `src/training/reward_model.py` | Binary pass/fail reward from local pytest execution |
 | **CV Evaluator** | `src/evaluation/cv_evaluator.py` | Group K-Fold cross-validation with Phase 1 + Phase 2 simulation |
 | **Mock Sandbox** | `src/evaluation/mock_sandbox.py` | Lightweight 2-file workspace for local structural tests |
-| **Submission Packager** | `src/deployment/submission_packager.py` | Assemble `kaggle_staging/`, validate constraints, zip |
-| **Version Manager** | `src/deployment/version_manager.py` | Auto-increment versions, push via Kaggle CLI |
+| **Submission Packager** | `src/deployment/submission_packager.py` | Assemble `submission.zip` on Kaggle from templates + trained adapters, validate constraints |
+| **Version Manager** | `src/deployment/version_manager.py` | Auto-increment versions, push `kaggle_staging/` as dataset via Kaggle CLI |
 | **Telemetry Logger** | `src/utils/telemetry_logger.py` | Structured logging of training metrics to `./logs/` |
 | **Config Manager** | `src/config/config_manager.py` | Central YAML-based configuration with env-var overrides |
 | **Peer Analyser** | `src/evaluation/peer_analyser.py` | Adversarial evaluation of high-scorer notebooks |
