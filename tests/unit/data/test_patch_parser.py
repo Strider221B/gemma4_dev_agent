@@ -17,9 +17,9 @@ class TestPatchParser:
         +++ b/module.py
         @@ -10,3 +10,3 @@ def foo():
          def foo():
-         -    return 1
-         +    return 2
-         """
+        -    return 1
+        +    return 2
+        """
     )
     _DIFF_MULTI_HUNK: str = textwrap.dedent(
         """\
@@ -28,12 +28,12 @@ class TestPatchParser:
         +++ b/module.py
         @@ -1,3 +1,3 @@
          def a():
-         -    return 1
-         +    return 2
+        -    return 1
+        +    return 2
         @@ -10,3 +10,3 @@
          def b():
-         -    return 10
-         +    return 20
+        -    return 10
+        +    return 20
         """
     )
     _DIFF_MULTI_FILE: str = textwrap.dedent(
