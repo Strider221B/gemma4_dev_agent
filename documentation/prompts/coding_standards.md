@@ -112,8 +112,7 @@ Public members/methods MUST appear BEFORE non-public (protected/private) members
 ## 11. Python Virtual Environment
 
 - Do NOT create a new Python virtual environment unless one does not already exist.
-- By default, use the project-local virtual environment at `backend/.venv` (the standard Python convention).
-- Activate with: `source backend/.venv/bin/activate`.
+- Activate with: `source ~/python_envs/p313_llm/bin/activate`.
 - All dependency installations (`pip install`, `uv sync`) and script executions MUST run within the active virtual environment.
 
 ---
@@ -149,14 +148,11 @@ If any implementation contradicts these documents, the conflict MUST be flagged 
 
 ## 14. Local CI Verification (MANDATORY)
 
-Before considering any code complete, you MUST run the full CI pipeline locally and ensure all checks pass. The CI is configured in `backend/pyproject.toml` and consists of three stages that mirror the GitHub Actions pipeline. **Code that fails any of these checks will break the CI build — do NOT commit or submit code that has not passed all three stages.**
-
-All commands MUST be run from the `backend/` directory using the project's virtual environment (see §11 for the correct path on your machine).
+Before considering any code complete, you MUST run the full CI pipeline locally and ensure all checks pass. The CI is configured in `pyproject.toml` and consists of three stages that mirror the GitHub Actions pipeline. **Code that fails any of these checks will break the CI build — do NOT commit or submit code that has not passed all three stages.**
 
 ### Stage 1: Lint (ruff)
 ```bash
 # Activate your virtual environment first (see §11 for your machine's path)
-cd backend
 uv run --with ruff ruff check .
 ```
 - Configuration: `[tool.ruff]` and `[tool.ruff.lint]` in `pyproject.toml`
@@ -167,7 +163,6 @@ uv run --with ruff ruff check .
 ### Stage 2: Type Check (mypy)
 ```bash
 # Activate your virtual environment first (see §11 for your machine's path)
-cd backend
 uv run --with mypy mypy app
 ```
 - Configuration: `[tool.mypy]` in `pyproject.toml`
@@ -178,7 +173,6 @@ uv run --with mypy mypy app
 ### Stage 3: Tests with Coverage (pytest)
 ```bash
 # Activate your virtual environment first (see §11 for your machine's path)
-cd backend
 uv run pytest
 ```
 - Configuration: `[tool.pytest.ini_options]` and `[tool.coverage.*]` in `pyproject.toml`
