@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from typing import cast
 
 
 class TokenCounter:
@@ -45,6 +46,6 @@ class TokenCounter:
         try:
             from transformers import AutoTokenizer
 
-            return AutoTokenizer.from_pretrained(name)
+            return cast(object, AutoTokenizer.from_pretrained(name))
         except Exception:
             return None
