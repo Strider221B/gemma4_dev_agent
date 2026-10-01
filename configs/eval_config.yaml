@@ -1,0 +1,39 @@
+# CV Evaluation Configuration
+# Version: 1.0.0
+
+cv:
+  num_folds: 4
+  random_seed: 42
+
+  # Budget (matches competition defaults)
+  max_tool_calls: 100
+  max_time_minutes: 60
+  max_turns: 500
+  command_timeout_seconds: 300
+
+  # Execution mode
+  mode: "full"          # "full" | "cached" | "dry_run"
+  sandbox: "docker"     # "docker" | "subprocess"
+  concurrency: 2        # Parallel task evaluation
+
+# Overfitting detection
+tracking:
+  gap_threshold: 0.15
+  trend_window: 5       # Look-back window for trend detection
+
+# Quick evaluation
+quick_eval:
+  task_ids:             # Specific tasks for rapid testing
+    - "fastapi_11194"
+    - "rich_3454"
+    - "requests_7205"
+    - "httpx_3672"
+
+# Paths
+data:
+  tasks_path: "/kaggle/input/gemma-4-developer-agent/published/tasks.jsonl"
+  snapshots_dir: "/kaggle/input/gemma-4-developer-agent/published/snapshots"
+  graphs_dir: "/kaggle/input/gemma-4-developer-agent/published/graphs"
+  embeddings_dir: "/kaggle/input/gemma-4-developer-agent/published/embeddings"
+
+output_dir: "/kaggle/working/cv_results"
