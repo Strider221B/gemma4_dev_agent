@@ -1,0 +1,56 @@
+# SFT Training Configuration
+# Version: 1.0.0
+
+model:
+  name: "google/gemma-4-31b-it-qat-w4a16-ct"
+  load_in_4bit: true
+  max_seq_length: 32768
+  dtype: "bfloat16"
+
+lora:
+  r: 32
+  lora_alpha: 64
+  lora_dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+  bias: "none"
+  task_type: "CAUSAL_LM"
+
+training:
+  num_epochs: 5
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 8
+  learning_rate: 2.0e-4
+  lr_scheduler_type: "cosine"
+  warmup_ratio: 0.05
+  weight_decay: 0.01
+  max_grad_norm: 1.0
+  bf16: true
+  gradient_checkpointing: true
+  max_seq_length: 28672
+  packing: true
+  eval_strategy: "steps"
+  eval_steps: 50
+  save_strategy: "steps"
+  save_steps: 50
+  load_best_model_at_end: true
+  metric_for_best_model: "eval_loss"
+  save_total_limit: 3
+  curriculum_enabled: true
+
+eval_fold: 0  # Hold out fastapi for validation
+output_dir: "/kaggle/working/checkpoints"
+log_path: "/kaggle/working/logs/run_sft.log"
+
+# Data paths (Kaggle)
+data:
+  tasks_path: "/kaggle/input/gemma-4-developer-agent/published/tasks.jsonl"
+  graphs_dir: "/kaggle/input/gemma-4-developer-agent/published/graphs"
+  embeddings_dir: "/kaggle/input/gemma-4-developer-agent/published/embeddings"
+  snapshots_dir: "/kaggle/input/gemma-4-developer-agent/published/snapshots"
