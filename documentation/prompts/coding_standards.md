@@ -153,7 +153,7 @@ Before considering any code complete, you MUST run the full CI pipeline locally 
 ### Stage 1: Lint (ruff)
 ```bash
 # Activate your virtual environment first (see §11 for your machine's path)
-uv run --with ruff ruff check .
+ruff check ./src
 ```
 - Configuration: `[tool.ruff]` and `[tool.ruff.lint]` in `pyproject.toml`
 - Rules: `E` (pycodestyle errors), `W` (pycodestyle warnings), `F` (pyflakes), `I` (isort)
@@ -163,7 +163,7 @@ uv run --with ruff ruff check .
 ### Stage 2: Type Check (mypy)
 ```bash
 # Activate your virtual environment first (see §11 for your machine's path)
-uv run --with mypy mypy app
+mypy ./src
 ```
 - Configuration: `[tool.mypy]` in `pyproject.toml`
 - Mode: `strict = true`
