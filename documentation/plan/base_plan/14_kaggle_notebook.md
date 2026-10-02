@@ -123,6 +123,7 @@ sft_pipeline = SFTTrainerPipeline(
 )
 
 sft_config = config.get_sft_config()
+print(f"Base model: {sft_config.model.get_resolved_path()}")
 sft_adapter_path = sft_pipeline.run(sft_config, dataset)
 print(f"SFT adapter saved to: {sft_adapter_path}")
 ```

@@ -485,7 +485,8 @@ def _train_dpo(
 # Version: 1.0.0
 
 model:
-  name: "google/gemma-4-31b-it-qat-w4a16-ct"
+  # Kaggle offline model path (or "google/gemma-4-31b-it-qat-w4a16-ct" resolved via ModelPathResolver)
+  name: "/kaggle/input/models/google/gemma-4/other/gemma-4-31b-it-qat-w4a16-ct/2"
   adapter_path: "/kaggle/working/checkpoints/sft_lora"
   max_seq_length: 32768
 

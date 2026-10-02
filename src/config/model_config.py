@@ -21,3 +21,9 @@ class ModelConfig(BaseModel):
     load_in_4bit: bool = _DEFAULT_LOAD_IN_4BIT
     max_seq_length: int = _DEFAULT_MAX_SEQ_LENGTH
     dtype: str = _DEFAULT_DTYPE
+
+    def get_resolved_path(self) -> str:
+        """Resolve configured model identifier to local filesystem path if available."""
+        from src.utils.model_path_resolver import ModelPathResolver
+
+        return ModelPathResolver.resolve(self.name)

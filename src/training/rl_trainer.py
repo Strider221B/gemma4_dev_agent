@@ -118,6 +118,9 @@ class RLTrainerPipeline:
         from peft import PeftModel
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
+        from src.utils.model_path_resolver import ModelPathResolver
+
+        resolved_path = ModelPathResolver.resolve(config.model.name)
         quant_cls: Any = BitsAndBytesConfig
         quantization_config = quant_cls(
             load_in_4bit=config.model.load_in_4bit,
@@ -126,12 +129,12 @@ class RLTrainerPipeline:
             bnb_4bit_use_double_quant=True,
         )
         base_model: Any = AutoModelForCausalLM.from_pretrained(
-            config.model.name,
+            resolved_path,
             quantization_config=quantization_config,
             device_map=self._DEVICE_MAP,
             torch_dtype=self._resolve_dtype(config.model.dtype),
         )
-        tokenizer = AutoTokenizer.from_pretrained(config.model.name)
+        tokenizer = AutoTokenizer.from_pretrained(resolved_path)
         peft_model: Any = PeftModel.from_pretrained(base_model, str(config.adapter_path))
         if hasattr(peft_model, "merge_and_unload"):
             peft_model = peft_model.merge_and_unload()

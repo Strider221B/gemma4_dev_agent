@@ -146,6 +146,9 @@ class SFTTrainerPipeline:
         """Load base language model and tokenizer using HuggingFace transformers."""
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
+        from src.utils.model_path_resolver import ModelPathResolver
+
+        resolved_path = ModelPathResolver.resolve(config.name)
         quant_cls: Any = BitsAndBytesConfig
         quantization_config = quant_cls(
             load_in_4bit=config.load_in_4bit,
@@ -154,13 +157,13 @@ class SFTTrainerPipeline:
             bnb_4bit_use_double_quant=True,
         )
         model = AutoModelForCausalLM.from_pretrained(
-            config.name,
+            resolved_path,
             quantization_config=quantization_config,
             device_map=self._DEVICE_MAP,
             trust_remote_code=True,
             torch_dtype=self._resolve_dtype(config.dtype),
         )
-        tokenizer = AutoTokenizer.from_pretrained(config.name, trust_remote_code=True)
+        tokenizer = AutoTokenizer.from_pretrained(resolved_path, trust_remote_code=True)
         return model, tokenizer
 
     def _log_trainable_params(self, model: object) -> None:

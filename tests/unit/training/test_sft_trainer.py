@@ -205,6 +205,26 @@ class TestSFTTrainerPipeline:
         with pytest.raises(ValueError, match="Missing required special token"):
             pipeline._verify_special_tokens(object())
 
+    def test_load_model_resolves_path(self, mock_env: dict[str, MagicMock]) -> None:
+        """Verify _load_model uses ModelPathResolver to determine model path."""
+        checkpoint_mgr = MagicMock()
+        telemetry = MagicMock()
+        curriculum = MagicMock()
+        pipeline = SFTTrainerPipeline(checkpoint_mgr, telemetry, curriculum)
+        config = SFTConfig()
+
+        with patch("src.utils.model_path_resolver.ModelPathResolver.resolve") as mock_res:
+            mock_res.return_value = "/resolved/model/path"
+            pipeline._load_model(config.model)
+            mock_res.assert_called_once_with(config.model.name)
+            mock_env["transformers"].AutoModelForCausalLM.from_pretrained.assert_called_with(
+                "/resolved/model/path",
+                quantization_config=mock_env["transformers"].BitsAndBytesConfig.return_value,
+                device_map="auto",
+                trust_remote_code=True,
+                torch_dtype=mock_env["torch"].bfloat16,
+            )
+
     def _build_mock_objects(self) -> dict[str, MagicMock]:
         """Construct mock instances for external training libraries."""
         mock_peft, mock_trl, mock_transformers = MagicMock(), MagicMock(), MagicMock()

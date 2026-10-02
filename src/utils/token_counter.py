@@ -46,6 +46,9 @@ class TokenCounter:
         try:
             from transformers import AutoTokenizer
 
-            return cast(object, AutoTokenizer.from_pretrained(name))
+            from src.utils.model_path_resolver import ModelPathResolver
+
+            resolved_path = ModelPathResolver.resolve(name)
+            return cast(object, AutoTokenizer.from_pretrained(resolved_path))
         except Exception:
             return None
