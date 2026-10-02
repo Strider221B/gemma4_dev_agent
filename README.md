@@ -163,10 +163,10 @@ Verify `kaggle_staging/dataset-metadata.json` points to your Kaggle username and
 You can use `VersionManager` or the Kaggle CLI directly:
 ```bash
 # Create dataset for the first time:
-kaggle datasets create -p kaggle_staging/
+kaggle datasets create -p kaggle_staging/ --dir-mode zip
 
 # Or bump version and push new release:
-kaggle datasets version -p kaggle_staging/ -m "v0.1.0: update pipeline and training notebook"
+kaggle datasets version -p kaggle_staging/ --dir-mode zip -m "v0.1.0: update pipeline and training notebook"
 ```
 
 ---
@@ -185,7 +185,7 @@ kaggle datasets version -p kaggle_staging/ -m "v0.1.0: update pipeline and train
 
 | Cell | Stage | Actions Performed |
 |---|---|---|
-| **Cell 1** | **Install Package** | Executes `!pip install -e /kaggle/input/gemma4-dev-agent-code/src --quiet` to register `src`. |
+| **Cell 1** | **Register Package Path** | Adds `/kaggle/input/gemma4-dev-agent-code` to `sys.path` to import `src`. |
 | **Cell 2** | **Import Modules** | Imports [`ConfigManager`](src/config/config_manager.py), [`DatasetBuilder`](src/data/dataset_builder.py), [`SFTTrainerPipeline`](src/training/sft_trainer.py), [`SubmissionPackager`](src/deployment/submission_packager.py), etc. |
 | **Cell 3** | **Load Config** | Reads `/kaggle/input/gemma4-dev-agent-code/configs/sft_config.yaml` and initializes `/kaggle/working/logs`. |
 | **Cell 4** | **Build Dataset** | Ingests `tasks.jsonl`, graphs, and embeddings; synthesizes trajectories and assigns CV folds. |

@@ -30,10 +30,15 @@ This is a Jupyter notebook. Create it as a Python script that will be converted 
 
 **Cell structure:**
 
-### Cell 1: Install our code package
+### Cell 1: Register our code package path
 ```python
-# Install our code from the uploaded Kaggle dataset
-!pip install -e /kaggle/input/gemma4-dev-agent-code/src --quiet
+# Add uploaded Kaggle dataset code package to Python search path
+import sys
+
+dataset_dir = "/kaggle/input/gemma4-dev-agent-code"
+if dataset_dir not in sys.path:
+    sys.path.insert(0, dataset_dir)
+print(f"Configured sys.path with {dataset_dir}")
 ```
 
 ### Cell 2: Import modules

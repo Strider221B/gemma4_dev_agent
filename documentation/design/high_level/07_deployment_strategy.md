@@ -20,7 +20,7 @@ flowchart LR
     end
 
     subgraph KAGGLE_NB["Kaggle Notebook: Training + Packaging"]
-        IMPORT["pip install -e\n/kaggle/input/.../src"]
+        IMPORT["sys.path.insert(0,\n/kaggle/input/.../gemma4-dev-agent-code)"]
         TRAIN["SFT → RL Training\n(produces adapters)"]
         PKG["SubmissionPackager\n(templates + adapters)"]
         VALIDATE_K["ConstraintValidator\n(size, format, schema)"]
@@ -247,8 +247,10 @@ class DeploymentOrchestrator:
 ### 4.1 Training Notebook Structure (`notebooks/train_notebook.ipynb`)
 
 ```python
-# Cell 1: Install our code package from the uploaded dataset
-!pip install -e /kaggle/input/gemma4-dev-agent-code/src
+# Cell 1: Register our code package from the uploaded dataset
+import sys
+if "/kaggle/input/gemma4-dev-agent-code" not in sys.path:
+    sys.path.insert(0, "/kaggle/input/gemma4-dev-agent-code")
 
 # Cell 2: Import pipeline modules
 from src.config.config_manager import ConfigManager

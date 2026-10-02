@@ -24,7 +24,7 @@ flowchart TB
     subgraph KAGGLE["Kaggle Notebook (4×L4 GPUs)"]
         direction TB
         NB["train_notebook.ipynb"]
-        DS_REMOTE -->|"pip install -e\n/kaggle/input/.../src"| NB
+        DS_REMOTE -->|"sys.path.insert(0,\n/kaggle/input/...)"| NB
 
         subgraph DATA_LAYER["Data Layer"]
             direction LR
@@ -271,7 +271,7 @@ gemma4_dev_agent/
 
 ### 3.5 Data Flow: Local → Kaggle → Evaluation
 1. **Local**: `src/` + `configs/` + `submission_templates/` staged into `kaggle_staging/` → uploaded as Kaggle dataset
-2. **Kaggle Notebook**: Imports dataset → `pip install -e` the `src/` package → runs training → saves adapters → copies templates + adapters into `/kaggle/working/submission/` → zips as `submission.zip`
+2. **Kaggle Notebook**: Imports dataset → registers `src/` on `sys.path` → runs training → saves adapters → copies templates + adapters into `/kaggle/working/submission/` → zips as `submission.zip`
 3. **Evaluation Harness**: Loads `submission.zip` → compiles `agent.yaml` → runs inference → produces `submission.parquet`
 
 ### 3.6 Runtime (Competition Evaluation)
