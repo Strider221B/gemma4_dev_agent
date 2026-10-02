@@ -30,10 +30,21 @@ This is a Jupyter notebook. Create it as a Python script that will be converted 
 
 **Cell structure:**
 
-### Cell 1: Install our code package
+### Cell 1: Register our code package path
 ```python
-# Install our code from the uploaded Kaggle dataset
-!pip install -e /kaggle/input/gemma4-dev-agent-code/src --quiet
+# Add uploaded Kaggle dataset code package to Python search path
+import os
+import sys
+
+possible_paths = [
+    "/kaggle/input/datasets/someshchatterjee/gemma4-dev-agent-code",
+    "/kaggle/input/gemma4-dev-agent-code",
+]
+
+DATASET_DIR = next((p for p in possible_paths if os.path.exists(p)), possible_paths[0])
+if DATASET_DIR not in sys.path:
+    sys.path.insert(0, DATASET_DIR)
+print(f"Configured sys.path with DATASET_DIR: {DATASET_DIR}")
 ```
 
 ### Cell 2: Import modules
@@ -66,7 +77,7 @@ from src.utils.token_counter import TokenCounter
 
 ### Cell 3: Load configuration
 ```python
-config = ConfigManager.load("/kaggle/input/gemma4-dev-agent-code/configs/sft_config.yaml")
+config = ConfigManager.load(f"{DATASET_DIR}/configs/sft_config.yaml")
 telemetry = TelemetryLogger(log_dir="/kaggle/working/logs", run_version="v0.1.0")
 ```
 
@@ -157,7 +168,7 @@ print(f"SFT adapter saved to: {sft_adapter_path}")
 from src.config.deploy_config import DeployConfig
 
 deploy_config = DeployConfig(
-    templates_dir="/kaggle/input/gemma4-dev-agent-code/submission_templates",
+    templates_dir=f"{DATASET_DIR}/submission_templates",
     output_dir="/kaggle/working/submission",
     zip_path="/kaggle/working/submission.zip",
     adapters=[{

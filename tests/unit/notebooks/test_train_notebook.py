@@ -53,12 +53,12 @@ class TestTrainNotebook:
             assert required_import in cell2_source, f"Missing import: {required_import}"
 
     def test_train_notebook_contains_install_and_packaging_cells(self) -> None:
-        """Verify initial cell contains install and final cell packages submission."""
+        """Verify initial cell sets up module search path and final cell packages submission."""
         parser = NotebookParser()
         nb = parser.load_notebook(self._NOTEBOOK_PATH)
         code_cells = parser.extract_code_cells(nb)
         cell1_source = str(code_cells[0][self._KEY_SOURCE])
         cell8_source = str(code_cells[7][self._KEY_SOURCE])
-        assert "pip install" in cell1_source
+        assert "sys.path" in cell1_source
         assert "SubmissionPackager" in cell8_source
         assert "packager.package" in cell8_source

@@ -20,7 +20,7 @@ flowchart LR
     end
 
     subgraph KAGGLE_NB["Kaggle Notebook: Training + Packaging"]
-        IMPORT["pip install -e\n/kaggle/input/.../src"]
+        IMPORT["sys.path.insert(0,\n/kaggle/input/.../gemma4-dev-agent-code)"]
         TRAIN["SFT → RL Training\n(produces adapters)"]
         PKG["SubmissionPackager\n(templates + adapters)"]
         VALIDATE_K["ConstraintValidator\n(size, format, schema)"]
@@ -247,8 +247,17 @@ class DeploymentOrchestrator:
 ### 4.1 Training Notebook Structure (`notebooks/train_notebook.ipynb`)
 
 ```python
-# Cell 1: Install our code package from the uploaded dataset
-!pip install -e /kaggle/input/gemma4-dev-agent-code/src
+# Cell 1: Register our code package from the uploaded dataset
+import os
+import sys
+
+possible_paths = [
+    "/kaggle/input/datasets/someshchatterjee/gemma4-dev-agent-code",
+    "/kaggle/input/gemma4-dev-agent-code",
+]
+DATASET_DIR = next((p for p in possible_paths if os.path.exists(p)), possible_paths[0])
+if DATASET_DIR not in sys.path:
+    sys.path.insert(0, DATASET_DIR)
 
 # Cell 2: Import pipeline modules
 from src.config.config_manager import ConfigManager
@@ -258,7 +267,7 @@ from src.training.rl_trainer import RLTrainerPipeline
 from src.deployment.submission_packager import SubmissionPackager
 
 # Cell 3: Load config from the uploaded dataset
-config = ConfigManager.load("/kaggle/input/gemma4-dev-agent-code/configs/sft_config.yaml")
+config = ConfigManager.load(f"{DATASET_DIR}/configs/sft_config.yaml")
 
 # Cell 4: Build dataset from competition data
 dataset = DatasetBuilder(config).build()

@@ -63,7 +63,7 @@ flowchart LR
         CONT_B["Container B\nVerification Sandbox"]
     end
 
-    DATASET -->|"pip install -e\n/kaggle/input/.../src"| NB
+    DATASET -->|"sys.path.insert(0,\n/kaggle/input/...)"| NB
     NB --> SFT
     NB --> RL
     SFT -->|"adapter_model.safetensors"| PKG
