@@ -1,0 +1,5 @@
+evaluation:
+  max_time_minutes: 30
+  max_tool_calls: 75
+  max_turns: 200
+  timeout_seconds: 300

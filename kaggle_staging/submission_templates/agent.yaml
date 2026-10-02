@@ -1,0 +1,24 @@
+name: root_coder
+model: gemma-4-31b-it-qat-w4a16-ct
+adapter: coder_lora
+
+instruction: !include prompts/system.md
+
+tools:
+  - edit_file
+  - write_file
+  - run_command
+  - submit_patch
+  - get_status
+  - agent_tool:
+      config_path: sub_agents/code_analyzer.yaml
+      skip_summarization: true
+
+generate_content_config:
+  max_output_tokens: 16384
+  temperature: 0.2
+  top_p: 0.95
+  top_k: 40
+  thinking_config:
+    include_thoughts: true
+    thinking_budget: 4096
