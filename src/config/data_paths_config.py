@@ -11,16 +11,16 @@ class DataPathsConfig(BaseModel):
     """Configuration settings for dataset and graph artifact file paths."""
 
     _DEFAULT_TASKS_PATH: ClassVar[str] = (
-        "/kaggle/input/gemma-4-developer-agent/published/tasks.jsonl"
+        "/kaggle/input/competitions/gemma-4-developer-agent/tasks.jsonl"
     )
     _DEFAULT_GRAPHS_DIR: ClassVar[str] = (
-        "/kaggle/input/gemma-4-developer-agent/published/graphs"
+        "/kaggle/input/competitions/gemma-4-developer-agent/graphs"
     )
     _DEFAULT_EMBEDDINGS_DIR: ClassVar[str] = (
-        "/kaggle/input/gemma-4-developer-agent/published/embeddings"
+        "/kaggle/input/competitions/gemma-4-developer-agent/embeddings"
     )
     _DEFAULT_SNAPSHOTS_DIR: ClassVar[str] = (
-        "/kaggle/input/gemma-4-developer-agent/published/snapshots"
+        "/kaggle/input/competitions/gemma-4-developer-agent/snapshots"
     )
 
     model_config = ConfigDict(extra="ignore")

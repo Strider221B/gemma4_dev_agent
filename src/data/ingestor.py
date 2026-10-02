@@ -37,6 +37,9 @@ class DataIngestor:
     _KEY_TEST_PATCH: str = "test_patch"
     _KEY_CREATED_AT: str = "created_at"
     _EMPTY_STR: str = ""
+    _COMPETITION_TASKS_FALLBACK: str = (
+        "/kaggle/input/competitions/gemma-4-developer-agent/tasks.jsonl"
+    )
 
     def __init__(self, data_paths: DataPathsConfig) -> None:
         """Initialize DataIngestor with configured artifact paths."""
@@ -44,7 +47,7 @@ class DataIngestor:
 
     def load_tasks(self) -> list[Task]:
         """Read tasks.jsonl and parse each line into a Task object."""
-        path = Path(self._data_paths.tasks_path)
+        path = self._resolve_tasks_path()
         if not path.is_file():
             return []
         tasks: list[Task] = []
@@ -156,3 +159,13 @@ class DataIngestor:
             if isinstance(content, dict):
                 return {str(k): v for k, v in content.items()}
             return {}
+
+    def _resolve_tasks_path(self) -> Path:
+        """Resolve tasks.jsonl checking configured path then competition fallback."""
+        configured = Path(self._data_paths.tasks_path)
+        if configured.is_file():
+            return configured
+        fallback = Path(self._COMPETITION_TASKS_FALLBACK)
+        if fallback.is_file():
+            return fallback
+        return configured
