@@ -248,9 +248,16 @@ class DeploymentOrchestrator:
 
 ```python
 # Cell 1: Register our code package from the uploaded dataset
+import os
 import sys
-if "/kaggle/input/gemma4-dev-agent-code" not in sys.path:
-    sys.path.insert(0, "/kaggle/input/gemma4-dev-agent-code")
+
+possible_paths = [
+    "/kaggle/input/datasets/someshchatterjee/gemma4-dev-agent-code",
+    "/kaggle/input/gemma4-dev-agent-code",
+]
+DATASET_DIR = next((p for p in possible_paths if os.path.exists(p)), possible_paths[0])
+if DATASET_DIR not in sys.path:
+    sys.path.insert(0, DATASET_DIR)
 
 # Cell 2: Import pipeline modules
 from src.config.config_manager import ConfigManager
@@ -260,7 +267,7 @@ from src.training.rl_trainer import RLTrainerPipeline
 from src.deployment.submission_packager import SubmissionPackager
 
 # Cell 3: Load config from the uploaded dataset
-config = ConfigManager.load("/kaggle/input/gemma4-dev-agent-code/configs/sft_config.yaml")
+config = ConfigManager.load(f"{DATASET_DIR}/configs/sft_config.yaml")
 
 # Cell 4: Build dataset from competition data
 dataset = DatasetBuilder(config).build()

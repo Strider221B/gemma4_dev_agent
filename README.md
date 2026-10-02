@@ -185,9 +185,9 @@ kaggle datasets version -p kaggle_staging/ --dir-mode zip -m "v0.1.0: update pip
 
 | Cell | Stage | Actions Performed |
 |---|---|---|
-| **Cell 1** | **Register Package Path** | Adds `/kaggle/input/gemma4-dev-agent-code` to `sys.path` to import `src`. |
+| **Cell 1** | **Register Package Path** | Resolves `DATASET_DIR` (supporting `/kaggle/input/datasets/someshchatterjee/gemma4-dev-agent-code` and standard slugs) and adds to `sys.path`. |
 | **Cell 2** | **Import Modules** | Imports [`ConfigManager`](src/config/config_manager.py), [`DatasetBuilder`](src/data/dataset_builder.py), [`SFTTrainerPipeline`](src/training/sft_trainer.py), [`SubmissionPackager`](src/deployment/submission_packager.py), etc. |
-| **Cell 3** | **Load Config** | Reads `/kaggle/input/gemma4-dev-agent-code/configs/sft_config.yaml` and initializes `/kaggle/working/logs`. |
+| **Cell 3** | **Load Config** | Reads `{DATASET_DIR}/configs/sft_config.yaml` and initializes `/kaggle/working/logs`. |
 | **Cell 4** | **Build Dataset** | Ingests `tasks.jsonl`, graphs, and embeddings; synthesizes trajectories and assigns CV folds. |
 | **Cell 5** | **SFT Training** | Loads 4-bit Gemma 4 base model, applies QLoRA adapters, runs curriculum training, and saves checkpoint to `/kaggle/working/checkpoints/sft_lora/`. |
 | **Cell 6** | **RL Training** | *(Optional)* Runs preference optimization and GRPO reward-driven reinforcement learning. |
