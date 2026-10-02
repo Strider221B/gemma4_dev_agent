@@ -172,6 +172,7 @@ class TestRLTrainerPipeline:
         pipeline, _, _, mock_telemetry = pipeline_fixture
         mock_transformers = MagicMock()
         mock_peft = MagicMock()
+        mock_torch = MagicMock()
         mock_model = MagicMock()
         mock_tokenizer = MagicMock()
         mock_transformers.AutoModelForCausalLM.from_pretrained.return_value = mock_model
@@ -183,7 +184,12 @@ class TestRLTrainerPipeline:
         mock_peft.PeftModel.from_pretrained.return_value = mock_peft_inst
 
         with patch.dict(
-            "sys.modules", {"transformers": mock_transformers, "peft": mock_peft}
+            "sys.modules",
+            {
+                "transformers": mock_transformers,
+                "peft": mock_peft,
+                "torch": mock_torch,
+            },
         ):
             config = RLConfig()
             model, tokenizer = pipeline._load_sft_model(config)
@@ -200,12 +206,17 @@ class TestRLTrainerPipeline:
             RLTrainerPipeline, MagicMock, MagicMock, MagicMock
         ],
     ) -> None:
-        """Verify _resolve_dtype resolves known dtypes and defaults to bfloat16."""
+        """Verify _resolve_dtype resolves known dtypes and handles ImportError."""
         pipeline, _, _, _ = pipeline_fixture
-        assert pipeline._resolve_dtype("bfloat16") is not None
-        assert pipeline._resolve_dtype("float16") is not None
-        assert pipeline._resolve_dtype("float32") is not None
-        assert pipeline._resolve_dtype("unknown") is not None
+        mock_torch = MagicMock()
+        with patch.dict("sys.modules", {"torch": mock_torch}):
+            assert pipeline._resolve_dtype("bfloat16") is not None
+            assert pipeline._resolve_dtype("float16") is not None
+            assert pipeline._resolve_dtype("float32") is not None
+            assert pipeline._resolve_dtype("unknown") is not None
+
+        with patch.dict("sys.modules", {"torch": None}):
+            assert pipeline._resolve_dtype("bfloat16") == "bfloat16"
 
     def test_train_grpo_instantiates_trainer(
         self,

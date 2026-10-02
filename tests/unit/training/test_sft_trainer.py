@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -29,6 +29,7 @@ class TestSFTTrainerPipeline:
         monkeypatch.setitem(sys.modules, "peft", mocks["peft"])
         monkeypatch.setitem(sys.modules, "trl", mocks["trl"])
         monkeypatch.setitem(sys.modules, "transformers", mocks["transformers"])
+        monkeypatch.setitem(sys.modules, "torch", mocks["torch"])
         return mocks
 
     def test_apply_lora_without_get_nb_trainable_parameters(
@@ -110,16 +111,21 @@ class TestSFTTrainerPipeline:
         assert val_ds is opaque_dataset
 
     def test_resolve_dtype_returns_expected_types(self) -> None:
-        """Verify _resolve_dtype resolves known dtypes and defaults to bfloat16."""
+        """Verify _resolve_dtype resolves known dtypes and handles ImportError."""
         checkpoint_mgr = MagicMock()
         telemetry = MagicMock()
         curriculum = MagicMock()
         pipeline = SFTTrainerPipeline(checkpoint_mgr, telemetry, curriculum)
 
-        assert pipeline._resolve_dtype("bfloat16") is not None
-        assert pipeline._resolve_dtype("float16") is not None
-        assert pipeline._resolve_dtype("float32") is not None
-        assert pipeline._resolve_dtype("unknown") is not None
+        mock_torch = MagicMock()
+        with patch.dict(sys.modules, {"torch": mock_torch}):
+            assert pipeline._resolve_dtype("bfloat16") is not None
+            assert pipeline._resolve_dtype("float16") is not None
+            assert pipeline._resolve_dtype("float32") is not None
+            assert pipeline._resolve_dtype("unknown") is not None
+
+        with patch.dict(sys.modules, {"torch": None}):
+            assert pipeline._resolve_dtype("bfloat16") == "bfloat16"
 
     def test_run_calls_apply_lora_and_logs_trainable_params(
         self, mock_env: dict[str, MagicMock]
@@ -202,6 +208,7 @@ class TestSFTTrainerPipeline:
     def _build_mock_objects(self) -> dict[str, MagicMock]:
         """Construct mock instances for external training libraries."""
         mock_peft, mock_trl, mock_transformers = MagicMock(), MagicMock(), MagicMock()
+        mock_torch = MagicMock()
         mock_model = MagicMock()
         mock_model.get_nb_trainable_parameters.return_value = (1_000, 10_000)
 
@@ -229,6 +236,7 @@ class TestSFTTrainerPipeline:
             "peft": mock_peft,
             "trl": mock_trl,
             "transformers": mock_transformers,
+            "torch": mock_torch,
             "model": mock_model,
             "tokenizer": mock_tokenizer,
             "trainer": mock_trainer,

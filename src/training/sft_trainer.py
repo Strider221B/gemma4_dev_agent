@@ -236,14 +236,17 @@ class SFTTrainerPipeline:
 
     def _resolve_dtype(self, dtype_str: str) -> object:
         """Convert string dtype identifier to torch dtype."""
-        import torch
+        try:
+            import torch
 
-        dtype_map: dict[str, object] = {
-            self._DTYPE_BFLOAT16: torch.bfloat16,
-            self._DTYPE_FLOAT16: torch.float16,
-            self._DTYPE_FLOAT32: torch.float32,
-        }
-        return dtype_map.get(dtype_str, torch.bfloat16)
+            dtype_map: dict[str, object] = {
+                self._DTYPE_BFLOAT16: torch.bfloat16,
+                self._DTYPE_FLOAT16: torch.float16,
+                self._DTYPE_FLOAT32: torch.float32,
+            }
+            return dtype_map.get(dtype_str, torch.bfloat16)
+        except ImportError:
+            return dtype_str
 
     def _save_adapter(self, model: object, path: str) -> str:
         """Save trained adapter checkpoint via CheckpointManager."""
