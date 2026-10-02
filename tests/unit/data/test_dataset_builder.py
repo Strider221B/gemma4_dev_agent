@@ -7,7 +7,6 @@ from unittest.mock import MagicMock
 from src.data.complexity_tier import ComplexityTier
 from src.data.dataset_builder import DatasetBuilder
 from src.data.mock_data_factory import MockDataFactory
-from src.data.task import Task
 from src.data.trajectory import Trajectory
 from src.data.turn import Turn
 from src.data.validation_result import ValidationResult
