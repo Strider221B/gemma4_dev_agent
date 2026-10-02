@@ -24,7 +24,7 @@
 | # | Document | Description |
 |---|---|---|
 | 01 | [Data Preprocessing](detailed/01_data_preprocessing.md) | Class diagrams, data models, trajectory synthesis algorithm, patch parser, mock mode |
-| 02 | [SFT Training](detailed/02_sft_training.md) | Full SFT pipeline: Unsloth loading, LoRA config, TRL SFTTrainer, curriculum, telemetry |
+| 02 | [SFT Training](detailed/02_sft_training.md) | Full SFT pipeline: HF Transformers + BitsAndBytes loading, LoRA config, TRL SFTTrainer, curriculum, telemetry |
 | 03 | [RL Training](detailed/03_rl_training.md) | GRPO/DPO implementations, multi-signal reward model, preference pair generation |
 | 04 | [CV Evaluator](detailed/04_cv_evaluator.md) | Full CV pipeline, budget simulation, report generation, actionable recommendations |
 | 05 | [Peer Solution Protocol](detailed/05_peer_solution_protocol.md) | 4-step adversarial validation, leakage detection, bootstrap significance, technique isolation |
@@ -42,7 +42,8 @@
 - **Eval time**: 12 hours for all tasks
 
 ### Training Stack
-- **Unsloth** — Memory-optimised 4-bit model loading
+- **HuggingFace Transformers** — Model loading with `AutoModelForCausalLM`
+- **BitsAndBytes** — 4-bit quantisation via `BitsAndBytesConfig`
 - **TRL** — SFTTrainer, GRPOTrainer, DPOTrainer
 - **PEFT** — LoRA adapter management
 - **HuggingFace Datasets** — Data pipeline

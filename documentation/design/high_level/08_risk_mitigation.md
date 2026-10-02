@@ -12,7 +12,7 @@
 | R4 | **Adapter size exceeds 3 GiB** | Low | Critical | **High** | Pre-flight size validation, conservative rank (r=32), size monitoring |
 | R5 | **edit_file matching failures** at eval time | Medium | High | **High** | Train on 3-tier matching patterns, use focused old_string (5-10 lines) |
 | R6 | **Scratch files leak into patch** | Medium | High | **High** | Train to use `/tmp/` exclusively, post-edit cleanup verification |
-| R7 | **OOM on 4×L4 during training** | Medium | High | **High** | Gradient checkpointing, batch_size=1 + accumulation, Unsloth memory optimisation |
+| R7 | **OOM on 4×L4 during training** | Medium | High | **High** | Gradient checkpointing, batch_size=1 + accumulation, bitsandbytes 4-bit quantisation |
 | R8 | **Peer solution is LB-overfit** — adopting it tanks private score | Medium | High | **High** | Adversarial CV stress test before any adoption |
 | R9 | **Agent modifies test files** — changes discarded in Phase 2 | Medium | Medium | **Medium** | Explicit system prompt rules, trajectory filtering, reward penalty |
 | R10 | **Agent exhausts tool budget** without submitting | Medium | Medium | **Medium** | Budget awareness training, `get_status()` calls, auto-submit on low budget |
