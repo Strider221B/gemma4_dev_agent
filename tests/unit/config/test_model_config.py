@@ -40,3 +40,8 @@ class TestModelConfig:
         """Verify passing incompatible types raises validation error."""
         with pytest.raises(ValidationError):
             ModelConfig(**{"max_seq_length": "not-an-integer"})
+
+    def test_get_resolved_path_delegates_to_resolver(self) -> None:
+        """Verify get_resolved_path delegates resolution to ModelPathResolver."""
+        config = ModelConfig(name=self._CUSTOM_NAME)
+        assert config.get_resolved_path() == self._CUSTOM_NAME

@@ -9,12 +9,16 @@ class TestConstants:
     """Test suite for shared utility constants."""
 
     _EXPECTED_MODEL: str = "google/gemma-4-31b-it-qat-w4a16-ct"
+    _EXPECTED_KAGGLE_MODEL: str = (
+        "/kaggle/input/models/google/gemma-4/other/gemma-4-31b-it-qat-w4a16-ct/2"
+    )
     _EXPECTED_CONTEXT: int = 32768
     _EXPECTED_RANK: int = 128
 
     def test_model_constants(self) -> None:
         """Verify model name and dimension constants."""
         assert utils_constants.MODEL_NAME == self._EXPECTED_MODEL
+        assert utils_constants.KAGGLE_MODEL_PATH == self._EXPECTED_KAGGLE_MODEL
         assert utils_constants.MAX_CONTEXT_WINDOW == self._EXPECTED_CONTEXT
         assert utils_constants.MAX_LORA_RANK == self._EXPECTED_RANK
 

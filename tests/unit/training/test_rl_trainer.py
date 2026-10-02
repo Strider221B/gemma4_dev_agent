@@ -200,6 +200,30 @@ class TestRLTrainerPipeline:
             lora_model = pipeline._merge_and_reapply_lora(model, config)
             assert lora_model == mock_model
 
+    def test_load_sft_model_resolves_path(
+        self,
+        pipeline_fixture: tuple[
+            RLTrainerPipeline, MagicMock, MagicMock, MagicMock
+        ],
+    ) -> None:
+        """Verify _load_sft_model resolves model path via ModelPathResolver."""
+        pipeline, _, _, _ = pipeline_fixture
+        mock_transformers, mock_peft = MagicMock(), MagicMock()
+        mock_peft.PeftModel.from_pretrained.return_value = MagicMock()
+
+        with patch.dict(
+            "sys.modules",
+            {"transformers": mock_transformers, "peft": mock_peft, "torch": MagicMock()},
+        ):
+            with patch(
+                "src.utils.model_path_resolver.ModelPathResolver.resolve",
+                return_value="/resolved/rl/model",
+            ) as mock_res:
+                pipeline._load_sft_model(RLConfig())
+                mock_res.assert_called_once()
+                call_args = mock_transformers.AutoModelForCausalLM.from_pretrained.call_args[0]
+                assert call_args[0] == "/resolved/rl/model"
+
     def test_resolve_dtype_returns_expected_types(
         self,
         pipeline_fixture: tuple[
