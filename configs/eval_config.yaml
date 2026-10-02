@@ -31,9 +31,9 @@ quick_eval:
 
 # Paths
 data:
-  tasks_path: "/kaggle/input/gemma-4-developer-agent/published/tasks.jsonl"
-  snapshots_dir: "/kaggle/input/gemma-4-developer-agent/published/snapshots"
-  graphs_dir: "/kaggle/input/gemma-4-developer-agent/published/graphs"
-  embeddings_dir: "/kaggle/input/gemma-4-developer-agent/published/embeddings"
+  tasks_path: "/kaggle/input/competitions/gemma-4-developer-agent/tasks.jsonl"
+  snapshots_dir: "/kaggle/input/competitions/gemma-4-developer-agent/snapshots"
+  graphs_dir: "/kaggle/input/competitions/gemma-4-developer-agent/graphs"
+  embeddings_dir: "/kaggle/input/competitions/gemma-4-developer-agent/embeddings"
 
 output_dir: "/kaggle/working/cv_results"

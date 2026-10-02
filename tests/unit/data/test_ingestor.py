@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 
@@ -90,6 +91,27 @@ class TestIngestor:
         config = DataPathsConfig(tasks_path=str(tmp_path / "missing.jsonl"))
         ingestor = DataIngestor(config)
         assert ingestor.load_tasks() == []
+
+    def test_load_tasks_with_competition_fallback(self, tmp_path: Path) -> None:
+        """Verify fallback to competition tasks path when configured path is missing."""
+        fallback_file = tmp_path / "fallback_tasks.jsonl"
+        task_data = {
+            "instance_id": self._SAMPLE_TASK_ID,
+            "repo": self._SAMPLE_REPO,
+            "base_commit": self._SAMPLE_COMMIT,
+            "problem_statement": self._SAMPLE_PROBLEM,
+            "hints_text": self._SAMPLE_HINTS,
+            "patch": self._SIMPLE_PATCH,
+            "test_patch": self._EMPTY_STR,
+            "created_at": self._SAMPLE_DATE,
+        }
+        fallback_file.write_text(json.dumps(task_data) + "\n", encoding="utf-8")
+        config = DataPathsConfig(tasks_path=str(tmp_path / "nonexistent.jsonl"))
+        ingestor = DataIngestor(config)
+        with patch.object(ingestor, "_COMPETITION_TASKS_FALLBACK", str(fallback_file)):
+            tasks = ingestor.load_tasks()
+            assert len(tasks) == 1
+            assert tasks[0].instance_id == self._SAMPLE_TASK_ID
 
     def test_classify_complexity_simple(self) -> None:
         """Verify 1 file and < 20 lines is classified as SIMPLE."""

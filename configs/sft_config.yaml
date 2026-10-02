@@ -50,7 +50,7 @@ log_path: "/kaggle/working/logs/run_sft.log"
 
 # Data paths (Kaggle)
 data:
-  tasks_path: "/kaggle/input/gemma-4-developer-agent/published/tasks.jsonl"
-  graphs_dir: "/kaggle/input/gemma-4-developer-agent/published/graphs"
-  embeddings_dir: "/kaggle/input/gemma-4-developer-agent/published/embeddings"
-  snapshots_dir: "/kaggle/input/gemma-4-developer-agent/published/snapshots"
+  tasks_path: "/kaggle/input/competitions/gemma-4-developer-agent/tasks.jsonl"
+  graphs_dir: "/kaggle/input/competitions/gemma-4-developer-agent/graphs"
+  embeddings_dir: "/kaggle/input/competitions/gemma-4-developer-agent/embeddings"
+  snapshots_dir: "/kaggle/input/competitions/gemma-4-developer-agent/snapshots"
