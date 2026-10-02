@@ -1,0 +1,14 @@
+# Peer Solution Registry
+# Updated: 2026-09-29
+
+solutions:
+  - name: "gemma-eda-baseline-for-a-start-lb-top-1"
+    author: "anonymous"
+    lb_score: null  # To be filled after inspection
+    capture_date: "2026-09-29"
+    local_path: "documentation/sample_code/high_scorers/gemma-eda-baseline-for-a-start-lb-top-1.ipynb"
+    status: "pending"
+    risk_level: null
+    cv_score: null
+    decision: null
+    notes: "First captured high-scorer. Requires full inspection."
