@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+kaggle_staging/src/
+kaggle_staging/notebooks/
+kaggle_staging/configs/
