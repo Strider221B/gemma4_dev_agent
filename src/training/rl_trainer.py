@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from src.config.rl_config import RLConfig
@@ -41,6 +41,13 @@ class RLTrainerPipeline:
         "up_proj",
         "down_proj",
     )
+    _BNB_QUANT_TYPE: str = "nf4"
+    _DEVICE_MAP: str = "auto"
+    _DTYPE_BFLOAT16: str = "bfloat16"
+    _DTYPE_FLOAT16: str = "float16"
+    _DTYPE_FLOAT32: str = "float32"
+    _KW_USE_REENTRANT: str = "use_reentrant"
+    _MSG_ADAPTER_MERGED: str = "SFT adapter merged into base model"
 
     def __init__(
         self,
@@ -94,38 +101,71 @@ class RLTrainerPipeline:
         """Compute recursive directory size using CheckpointManager helper."""
         return self._checkpoint_mgr._compute_total_size(path)
 
+    def _enable_gradient_checkpointing(self, model: object) -> None:
+        """Enable gradient checkpointing with non-reentrant mode for memory efficiency."""
+        if hasattr(model, "gradient_checkpointing_enable"):
+            getattr(model, "gradient_checkpointing_enable")(
+                gradient_checkpointing_kwargs={self._KW_USE_REENTRANT: False}
+            )
+
+    def _enable_input_grads(self, model: object) -> None:
+        """Enable input gradients required for LoRA training with quantised models."""
+        if hasattr(model, "enable_input_require_grads"):
+            getattr(model, "enable_input_require_grads")()
+
     def _load_sft_model(self, config: RLConfig) -> tuple[object, object]:
         """Load base pretrained language model and merge SFT adapter weights."""
         from peft import PeftModel
-        from unsloth import FastLanguageModel
+        from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
-        model, tokenizer = FastLanguageModel.from_pretrained(
-            model_name=config.model.name,
-            max_seq_length=config.model.max_seq_length,
+        quant_cls: Any = BitsAndBytesConfig
+        quantization_config = quant_cls(
             load_in_4bit=config.model.load_in_4bit,
-            dtype=config.model.dtype,
+            bnb_4bit_compute_dtype=self._resolve_dtype(config.model.dtype),
+            bnb_4bit_quant_type=self._BNB_QUANT_TYPE,
+            bnb_4bit_use_double_quant=True,
         )
-        adapter_path = config.adapter_path
-        model = PeftModel.from_pretrained(model, str(adapter_path))
-        if hasattr(model, "merge_and_unload"):
-            model = model.merge_and_unload()
-        self._telemetry.log_info("SFT adapter merged into base model")
-        return model, tokenizer
+        base_model: Any = AutoModelForCausalLM.from_pretrained(
+            config.model.name,
+            quantization_config=quantization_config,
+            device_map=self._DEVICE_MAP,
+            torch_dtype=self._resolve_dtype(config.model.dtype),
+        )
+        tokenizer = AutoTokenizer.from_pretrained(config.model.name)
+        peft_model: Any = PeftModel.from_pretrained(base_model, str(config.adapter_path))
+        if hasattr(peft_model, "merge_and_unload"):
+            peft_model = peft_model.merge_and_unload()
+        self._telemetry.log_info(self._MSG_ADAPTER_MERGED)
+        return peft_model, tokenizer
 
     def _merge_and_reapply_lora(self, model: object, config: RLConfig) -> object:
         """Attach fresh LoRA adapter layers on top of merged SFT base model."""
-        from unsloth import FastLanguageModel
+        from peft import LoraConfig as PeftLoraConfig
+        from peft import TaskType, get_peft_model
 
         lora_r = getattr(config.grpo, "lora_r", self._DEFAULT_LORA_R)
-        return FastLanguageModel.get_peft_model(
-            model,
+        lora_config = PeftLoraConfig(
             r=lora_r,
             lora_alpha=self._DEFAULT_LORA_ALPHA,
             lora_dropout=self._DEFAULT_LORA_DROPOUT,
             target_modules=list(self._TARGET_MODULES),
-            use_gradient_checkpointing="unsloth",
-            random_state=self._DEFAULT_RANDOM_STATE,
+            task_type=TaskType.CAUSAL_LM,
         )
+        self._enable_input_grads(model)
+        lora_model = get_peft_model(cast(Any, model), lora_config)
+        self._enable_gradient_checkpointing(lora_model)
+        return lora_model
+
+    def _resolve_dtype(self, dtype_str: str) -> object:
+        """Convert string dtype identifier to torch dtype."""
+        import torch
+
+        dtype_map: dict[str, object] = {
+            self._DTYPE_BFLOAT16: torch.bfloat16,
+            self._DTYPE_FLOAT16: torch.float16,
+            self._DTYPE_FLOAT32: torch.float32,
+        }
+        return dtype_map.get(dtype_str, torch.bfloat16)
 
     def _train_dpo(
         self, model: object, tokenizer: object, prompts: object, config: RLConfig
