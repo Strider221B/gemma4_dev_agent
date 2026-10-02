@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -24,11 +24,12 @@ class TestSFTTrainerPipeline:
 
     @pytest.fixture
     def mock_env(self, monkeypatch: pytest.MonkeyPatch) -> dict[str, MagicMock]:
-        """Set up mocked unsloth, trl, transformers, and model environment."""
+        """Set up mocked peft, trl, transformers, and model environment."""
         mocks = self._build_mock_objects()
-        monkeypatch.setitem(sys.modules, "unsloth", mocks["unsloth"])
+        monkeypatch.setitem(sys.modules, "peft", mocks["peft"])
         monkeypatch.setitem(sys.modules, "trl", mocks["trl"])
         monkeypatch.setitem(sys.modules, "transformers", mocks["transformers"])
+        monkeypatch.setitem(sys.modules, "torch", mocks["torch"])
         return mocks
 
     def test_apply_lora_without_get_nb_trainable_parameters(
@@ -41,10 +42,24 @@ class TestSFTTrainerPipeline:
         pipeline = SFTTrainerPipeline(checkpoint_mgr, telemetry, curriculum)
 
         plain_model = object()
-        mock_env["unsloth"].FastLanguageModel.get_peft_model.return_value = plain_model
+        mock_env["peft"].get_peft_model.return_value = plain_model
 
         result = pipeline._apply_lora(plain_model, SFTConfig().lora)
         assert result is plain_model
+
+    def test_enable_input_grads_and_checkpointing(self) -> None:
+        """Verify enable_input_grads and gradient checkpointing on model."""
+        checkpoint_mgr = MagicMock()
+        telemetry = MagicMock()
+        curriculum = MagicMock()
+        pipeline = SFTTrainerPipeline(checkpoint_mgr, telemetry, curriculum)
+
+        mock_model = MagicMock()
+        pipeline._enable_input_grads(mock_model)
+        mock_model.enable_input_require_grads.assert_called_once()
+
+        pipeline._enable_gradient_checkpointing(mock_model)
+        mock_model.gradient_checkpointing_enable.assert_called_once()
 
     def test_prepare_splits_filters_by_fold(self) -> None:
         """Verify dataset list split separates eval fold from train folds."""
@@ -95,6 +110,23 @@ class TestSFTTrainerPipeline:
         assert train_ds is opaque_dataset
         assert val_ds is opaque_dataset
 
+    def test_resolve_dtype_returns_expected_types(self) -> None:
+        """Verify _resolve_dtype resolves known dtypes and handles ImportError."""
+        checkpoint_mgr = MagicMock()
+        telemetry = MagicMock()
+        curriculum = MagicMock()
+        pipeline = SFTTrainerPipeline(checkpoint_mgr, telemetry, curriculum)
+
+        mock_torch = MagicMock()
+        with patch.dict(sys.modules, {"torch": mock_torch}):
+            assert pipeline._resolve_dtype("bfloat16") is not None
+            assert pipeline._resolve_dtype("float16") is not None
+            assert pipeline._resolve_dtype("float32") is not None
+            assert pipeline._resolve_dtype("unknown") is not None
+
+        with patch.dict(sys.modules, {"torch": None}):
+            assert pipeline._resolve_dtype("bfloat16") == "bfloat16"
+
     def test_run_calls_apply_lora_and_logs_trainable_params(
         self, mock_env: dict[str, MagicMock]
     ) -> None:
@@ -108,7 +140,7 @@ class TestSFTTrainerPipeline:
         config = SFTConfig()
 
         pipeline.run(config, [])
-        mock_env["unsloth"].FastLanguageModel.get_peft_model.assert_called_once()
+        mock_env["peft"].get_peft_model.assert_called_once()
         telemetry.log_info.assert_called_once()
 
     def test_run_executes_pipeline_and_returns_path(
@@ -175,7 +207,8 @@ class TestSFTTrainerPipeline:
 
     def _build_mock_objects(self) -> dict[str, MagicMock]:
         """Construct mock instances for external training libraries."""
-        mock_unsloth, mock_trl, mock_transformers = MagicMock(), MagicMock(), MagicMock()
+        mock_peft, mock_trl, mock_transformers = MagicMock(), MagicMock(), MagicMock()
+        mock_torch = MagicMock()
         mock_model = MagicMock()
         mock_model.get_nb_trainable_parameters.return_value = (1_000, 10_000)
 
@@ -183,11 +216,13 @@ class TestSFTTrainerPipeline:
         mock_tokenizer = MagicMock()
         mock_tokenizer.get_vocab.return_value = vocab
 
-        mock_unsloth.FastLanguageModel.from_pretrained.return_value = (
-            mock_model,
-            mock_tokenizer,
-        )
-        mock_unsloth.FastLanguageModel.get_peft_model.return_value = mock_model
+        mock_transformers.AutoModelForCausalLM.from_pretrained.return_value = mock_model
+        mock_transformers.AutoTokenizer.from_pretrained.return_value = mock_tokenizer
+        mock_transformers.BitsAndBytesConfig = MagicMock()
+
+        mock_peft.get_peft_model.return_value = mock_model
+        mock_peft.LoraConfig = MagicMock()
+        mock_peft.TaskType = MagicMock()
 
         mock_trainer = MagicMock()
         mock_trainer.train.return_value = SimpleNamespace(training_loss=self._TRAIN_LOSS)
@@ -198,9 +233,10 @@ class TestSFTTrainerPipeline:
         mock_trl.SFTConfig = MagicMock()
 
         return {
-            "unsloth": mock_unsloth,
+            "peft": mock_peft,
             "trl": mock_trl,
             "transformers": mock_transformers,
+            "torch": mock_torch,
             "model": mock_model,
             "tokenizer": mock_tokenizer,
             "trainer": mock_trainer,

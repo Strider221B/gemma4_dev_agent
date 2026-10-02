@@ -10,7 +10,7 @@ flowchart LR
         BASE["gemma-4-31b-it-qat\n(W4A16 Quantized)"]
         LORA1["QLoRA Adapter\nr=32, alpha=64"]
         SFT_DATA["Gold Trajectories\n(~400–800 examples)"]
-        SFT_TRAIN["SFTTrainer\n(Unsloth + TRL)"]
+        SFT_TRAIN["SFTTrainer\n(HF Transformers + PEFT + TRL)"]
         BASE --> SFT_TRAIN
         LORA1 --> SFT_TRAIN
         SFT_DATA --> SFT_TRAIN
@@ -52,7 +52,7 @@ Teach the model to:
 # configs/sft_config.yaml
 model:
   name: "google/gemma-4-31b-it-qat-w4a16-ct"
-  load_in_4bit: true               # Already W4A16, use as-is with Unsloth
+  load_in_4bit: true               # Already W4A16, loaded via BitsAndBytesConfig
   max_seq_length: 32768
   dtype: "bfloat16"                # Compute dtype
 
@@ -110,7 +110,7 @@ class SFTTrainerPipeline:
     """Orchestrates QLoRA SFT on gold trajectories."""
     
     def run(self, config: SFTConfig, dataset: Dataset) -> Path:
-        # 1. Load base model with Unsloth 4-bit optimisation
+        # 1. Load base model with BitsAndBytesConfig 4-bit quantisation
         model, tokenizer = FastLanguageModel.from_pretrained(
             model_name=config.model.name,
             max_seq_length=config.model.max_seq_length,

@@ -51,7 +51,7 @@ flowchart LR
 
     subgraph KAGGLE["Kaggle Notebook (4×L4 GPUs)"]
         NB["train_notebook.ipynb"]
-        SFT["SFT Trainer\n(Unsloth + TRL)"]
+        SFT["SFT Trainer\n(HF Transformers + PEFT + TRL)"]
         RL["RL Trainer\n(GRPO / DPO)"]
         PKG["Submission Packager"]
         SUB["/kaggle/working/\nsubmission.zip"]
@@ -84,7 +84,7 @@ flowchart LR
 | **Data Ingestor** | `src/data/ingestor.py` | Parse `tasks.jsonl`, load graph JSON, load embeddings `.npz` |
 | **Trajectory Synthesiser** | `src/data/trajectory_synthesiser.py` | Convert `(problem, patch, test_patch)` → multi-turn chat trajectories with tool calls |
 | **Chat Formatter** | `src/data/chat_formatter.py` | Apply Gemma 4 chat template tokens (`<start_of_turn>`, `<|tool_call|>`, etc.) |
-| **SFT Trainer** | `src/training/sft_trainer.py` | QLoRA SFT via Unsloth + TRL `SFTTrainer` |
+| **SFT Trainer** | `src/training/sft_trainer.py` | QLoRA SFT via HuggingFace transformers + PEFT + TRL `SFTTrainer` |
 | **RL Trainer** | `src/training/rl_trainer.py` | GRPO/DPO via TRL with custom reward model |
 | **Reward Model** | `src/training/reward_model.py` | Binary pass/fail reward from local pytest execution |
 | **CV Evaluator** | `src/evaluation/cv_evaluator.py` | Group K-Fold cross-validation with Phase 1 + Phase 2 simulation |

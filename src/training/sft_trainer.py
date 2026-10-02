@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from src.config.lora_config import LoRAConfig
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 
 class SFTTrainerPipeline:
-    """Orchestrates QLoRA supervised fine-tuning using Unsloth and TRL."""
+    """Orchestrates QLoRA supervised fine-tuning using HuggingFace transformers and TRL."""
 
     _ADAPTER_SIZE_LIMIT: int = 1_500_000_000
     _MIN_EVAL_LOSS_IMPROVEMENT: float = 0.001
@@ -33,6 +33,12 @@ class SFTTrainerPipeline:
     _EARLY_STOPPING_PATIENCE: int = 3
     _DEFAULT_RANDOM_STATE: int = 42
     _FOLD_KEY: str = "fold"
+    _BNB_QUANT_TYPE: str = "nf4"
+    _DEVICE_MAP: str = "auto"
+    _DTYPE_BFLOAT16: str = "bfloat16"
+    _DTYPE_FLOAT16: str = "float16"
+    _DTYPE_FLOAT32: str = "float32"
+    _KW_USE_REENTRANT: str = "use_reentrant"
 
     def __init__(
         self,
@@ -67,23 +73,23 @@ class SFTTrainerPipeline:
 
     def _apply_lora(self, model: object, config: LoRAConfig) -> object:
         """Apply QLoRA adapters targeting specified linear projection layers."""
-        from unsloth import FastLanguageModel
+        from peft import LoraConfig as PeftLoraConfig
+        from peft import TaskType, get_peft_model
 
-        lora_model = FastLanguageModel.get_peft_model(
-            model,
+        bias_val: Any = config.bias
+        lora_config = PeftLoraConfig(
             r=config.r,
             lora_alpha=config.lora_alpha,
             lora_dropout=config.lora_dropout,
             target_modules=config.target_modules,
-            bias=config.bias,
-            use_gradient_checkpointing="unsloth",
-            random_state=self._DEFAULT_RANDOM_STATE,
+            bias=bias_val,
+            task_type=TaskType.CAUSAL_LM,
             use_rslora=True,
-            loftq_config=None,
         )
-        if hasattr(lora_model, "get_nb_trainable_parameters"):
-            trainable, total = lora_model.get_nb_trainable_parameters()
-            self._telemetry.log_info(f"Trainable: {trainable:,} / {total:,}")
+        self._enable_input_grads(model)
+        lora_model = get_peft_model(cast(Any, model), lora_config)
+        self._enable_gradient_checkpointing(lora_model)
+        self._log_trainable_params(lora_model)
         return lora_model
 
     def _compute_size(self, path: str) -> int:
@@ -124,19 +130,44 @@ class SFTTrainerPipeline:
             callbacks=callbacks,
         )
 
-    def _load_model(self, config: ModelConfig) -> tuple[object, object]:
-        """Load base language model and tokenizer using Unsloth."""
-        from unsloth import FastLanguageModel
+    def _enable_gradient_checkpointing(self, model: object) -> None:
+        """Enable gradient checkpointing with non-reentrant mode for memory efficiency."""
+        if hasattr(model, "gradient_checkpointing_enable"):
+            getattr(model, "gradient_checkpointing_enable")(
+                gradient_checkpointing_kwargs={self._KW_USE_REENTRANT: False}
+            )
 
-        model, tokenizer = FastLanguageModel.from_pretrained(
-            model_name=config.name,
-            max_seq_length=config.max_seq_length,
-            dtype=config.dtype,
+    def _enable_input_grads(self, model: object) -> None:
+        """Enable input gradients required for LoRA training with quantised models."""
+        if hasattr(model, "enable_input_require_grads"):
+            getattr(model, "enable_input_require_grads")()
+
+    def _load_model(self, config: ModelConfig) -> tuple[object, object]:
+        """Load base language model and tokenizer using HuggingFace transformers."""
+        from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+        quant_cls: Any = BitsAndBytesConfig
+        quantization_config = quant_cls(
             load_in_4bit=config.load_in_4bit,
-            device_map="auto",
-            trust_remote_code=True,
+            bnb_4bit_compute_dtype=self._resolve_dtype(config.dtype),
+            bnb_4bit_quant_type=self._BNB_QUANT_TYPE,
+            bnb_4bit_use_double_quant=True,
         )
+        model = AutoModelForCausalLM.from_pretrained(
+            config.name,
+            quantization_config=quantization_config,
+            device_map=self._DEVICE_MAP,
+            trust_remote_code=True,
+            torch_dtype=self._resolve_dtype(config.dtype),
+        )
+        tokenizer = AutoTokenizer.from_pretrained(config.name, trust_remote_code=True)
         return model, tokenizer
+
+    def _log_trainable_params(self, model: object) -> None:
+        """Log trainable vs total parameter counts from PEFT model."""
+        if hasattr(model, "get_nb_trainable_parameters"):
+            trainable, total = getattr(model, "get_nb_trainable_parameters")()
+            self._telemetry.log_info(f"Trainable: {trainable:,} / {total:,}")
 
     def _log_training_end(
         self, train_result: object, trainer: object, adapter_path: str
@@ -202,6 +233,20 @@ class SFTTrainerPipeline:
             ]
             return train_items, val_items
         return dataset, dataset
+
+    def _resolve_dtype(self, dtype_str: str) -> object:
+        """Convert string dtype identifier to torch dtype."""
+        try:
+            import torch
+
+            dtype_map: dict[str, object] = {
+                self._DTYPE_BFLOAT16: torch.bfloat16,
+                self._DTYPE_FLOAT16: torch.float16,
+                self._DTYPE_FLOAT32: torch.float32,
+            }
+            return dtype_map.get(dtype_str, torch.bfloat16)
+        except ImportError:
+            return dtype_str
 
     def _save_adapter(self, model: object, path: str) -> str:
         """Save trained adapter checkpoint via CheckpointManager."""

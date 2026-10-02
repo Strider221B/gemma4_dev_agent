@@ -38,7 +38,7 @@ flowchart TB
 
         subgraph TRAIN_LAYER["Training Layer"]
             direction LR
-            SFT["SFTTrainer\n(Unsloth QLoRA)"]
+            SFT["SFTTrainer\n(HF Transformers + PEFT QLoRA)"]
             RL["RLTrainer\n(GRPO/DPO)"]
             CKPT["Checkpoint Manager\n(safetensors)"]
             HF_DS --> SFT
@@ -111,7 +111,7 @@ gemma4_dev_agent/
 │   │
 │   ├── training/
 │   │   ├── __init__.py
-│   │   ├── sft_trainer.py                # QLoRA SFT via Unsloth + TRL SFTTrainer
+│   │   ├── sft_trainer.py                # QLoRA SFT via HF Transformers + PEFT + TRL SFTTrainer
 │   │   ├── rl_trainer.py                 # GRPO/DPO via TRL with reward signals
 │   │   ├── reward_model.py               # Binary pass/fail reward from pytest
 │   │   ├── training_config.py            # Training hyperparameter schemas

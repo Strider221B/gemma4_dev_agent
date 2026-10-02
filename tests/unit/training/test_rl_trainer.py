@@ -148,29 +148,48 @@ class TestRLTrainerPipeline:
             self._MOCK_ADAPTER_PATH
         )
 
+    def test_enable_input_grads_and_checkpointing(
+        self,
+        pipeline_fixture: tuple[
+            RLTrainerPipeline, MagicMock, MagicMock, MagicMock
+        ],
+    ) -> None:
+        """Verify enable_input_grads and gradient checkpointing on model."""
+        pipeline, _, _, _ = pipeline_fixture
+        mock_model = MagicMock()
+        pipeline._enable_input_grads(mock_model)
+        mock_model.enable_input_require_grads.assert_called_once()
+        pipeline._enable_gradient_checkpointing(mock_model)
+        mock_model.gradient_checkpointing_enable.assert_called_once()
+
     def test_load_sft_model_and_reapply_lora(
         self,
         pipeline_fixture: tuple[
             RLTrainerPipeline, MagicMock, MagicMock, MagicMock
         ],
     ) -> None:
-        """Verify SFT model loading and LoRA re-application using mocked FastLanguageModel."""
+        """Verify SFT model loading and LoRA re-application using transformers and peft."""
         pipeline, _, _, mock_telemetry = pipeline_fixture
-        mock_unsloth = MagicMock()
+        mock_transformers = MagicMock()
         mock_peft = MagicMock()
+        mock_torch = MagicMock()
         mock_model = MagicMock()
         mock_tokenizer = MagicMock()
-        mock_unsloth.FastLanguageModel.from_pretrained.return_value = (
-            mock_model,
-            mock_tokenizer,
-        )
-        mock_unsloth.FastLanguageModel.get_peft_model.return_value = mock_model
+        mock_transformers.AutoModelForCausalLM.from_pretrained.return_value = mock_model
+        mock_transformers.AutoTokenizer.from_pretrained.return_value = mock_tokenizer
+        mock_transformers.BitsAndBytesConfig = MagicMock()
+        mock_peft.get_peft_model.return_value = mock_model
         mock_peft_inst = MagicMock()
         mock_peft_inst.merge_and_unload.return_value = mock_model
         mock_peft.PeftModel.from_pretrained.return_value = mock_peft_inst
 
         with patch.dict(
-            "sys.modules", {"unsloth": mock_unsloth, "peft": mock_peft}
+            "sys.modules",
+            {
+                "transformers": mock_transformers,
+                "peft": mock_peft,
+                "torch": mock_torch,
+            },
         ):
             config = RLConfig()
             model, tokenizer = pipeline._load_sft_model(config)
@@ -180,6 +199,24 @@ class TestRLTrainerPipeline:
 
             lora_model = pipeline._merge_and_reapply_lora(model, config)
             assert lora_model == mock_model
+
+    def test_resolve_dtype_returns_expected_types(
+        self,
+        pipeline_fixture: tuple[
+            RLTrainerPipeline, MagicMock, MagicMock, MagicMock
+        ],
+    ) -> None:
+        """Verify _resolve_dtype resolves known dtypes and handles ImportError."""
+        pipeline, _, _, _ = pipeline_fixture
+        mock_torch = MagicMock()
+        with patch.dict("sys.modules", {"torch": mock_torch}):
+            assert pipeline._resolve_dtype("bfloat16") is not None
+            assert pipeline._resolve_dtype("float16") is not None
+            assert pipeline._resolve_dtype("float32") is not None
+            assert pipeline._resolve_dtype("unknown") is not None
+
+        with patch.dict("sys.modules", {"torch": None}):
+            assert pipeline._resolve_dtype("bfloat16") == "bfloat16"
 
     def test_train_grpo_instantiates_trainer(
         self,

@@ -22,7 +22,7 @@ training = [
     "transformers>=4.40",
     "peft>=0.12",
     "trl>=0.9",
-    "unsloth",
+    "bitsandbytes>=0.43",
     "safetensors",
 ]
 dev = [
@@ -52,7 +52,7 @@ packages = ["src"]
 
 [[tool.mypy.overrides]]
 module = [
-    "unsloth.*",
+    "bitsandbytes.*",
     "trl.*",
     "peft.*",
     "transformers.*",
