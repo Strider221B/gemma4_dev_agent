@@ -1,0 +1,25 @@
+name: code_analyzer
+agent_class: LlmAgent
+model: gemma-4-31b-it-qat-w4a16-ct
+adapter: coder_lora
+
+description: |
+  Read-only code analysis agent. Use this to explore repository structure,
+  read files, search for code patterns, and understand call graphs.
+  Returns a structured summary of findings.
+
+instruction: !include prompts/navigator.md
+
+tools:
+  - read_file
+  - search_similar_code
+  - get_code_neighbors
+  - get_code_subgraph
+  - run_command
+
+generate_content_config:
+  max_output_tokens: 8192
+  temperature: 0.1
+  thinking_config:
+    include_thoughts: true
+    thinking_budget: 2048

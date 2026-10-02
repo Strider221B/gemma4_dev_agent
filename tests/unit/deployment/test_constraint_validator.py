@@ -25,6 +25,16 @@ class TestConstraintValidator:
     _FORBIDDEN_FILE: str = "model.bin"
     _SYMLINK_FILE: str = "link_to_agent.yaml"
     _OVERSIZED_BYTES: int = 4_000_000_000
+    _SUBMISSION_TEMPLATES_DIR: str = "kaggle_staging/submission_templates"
+    _EXPECTED_TEMPLATE_FILES: tuple[str, ...] = (
+        "agent.yaml",
+        "eval_config.yaml",
+        "prompts/system.md",
+        "prompts/navigator.md",
+        "prompts/patch_guidelines.md",
+        "sub_agents/code_analyzer.yaml",
+        "skills/repo_navigation/SKILL.md",
+    )
 
     @pytest.fixture
     def staging_dir(self, tmp_path: Path) -> Path:
@@ -192,6 +202,19 @@ class TestConstraintValidator:
         report = validator.validate(str(staging_dir))
         check = next(c for c in report.checks if c.name == "single_model")
         assert check.passed is False
+
+    def test_validate_submission_templates_directory_passes(self) -> None:
+        """Verify that actual submission_templates pass constraint validation."""
+        templates_path = Path(self._SUBMISSION_TEMPLATES_DIR)
+        if not templates_path.is_dir():
+            pytest.skip("submission_templates directory not present")
+        validator = ConstraintValidator()
+        report = validator.validate(str(templates_path))
+        assert report.all_passed is True
+        assert len(report.checks) == 10
+        assert all(c.passed for c in report.checks)
+        for rel_path in self._EXPECTED_TEMPLATE_FILES:
+            assert (templates_path / rel_path).is_file()
 
     def _create_valid_staging(self, tmp_path: Path) -> Path:
         staging = tmp_path / "staging"
