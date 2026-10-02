@@ -111,3 +111,19 @@ class TestTelemetryCallback:
         logger.log_info.assert_called_once_with(
             f"Checkpoint saved at step {self._STEP}, best metric: {self._EVAL_LOSS}"
         )
+
+    def test_unhandled_trainer_event_returns_noop_callable(self) -> None:
+        """Verify unhandled trainer event hook returns no-op callable."""
+        logger = MagicMock()
+        callback = TelemetryCallback(logger=logger)
+        handler = getattr(callback, "on_step_begin")
+        assert callable(handler)
+        assert handler(None, None, None) is None
+
+    def test_non_trainer_attribute_raises_attribute_error(self) -> None:
+        """Verify accessing non-event attribute raises AttributeError."""
+        logger = MagicMock()
+        callback = TelemetryCallback(logger=logger)
+        with pytest.raises(AttributeError, match="has no attribute 'invalid_attr'"):
+            _ = getattr(callback, "invalid_attr")
+

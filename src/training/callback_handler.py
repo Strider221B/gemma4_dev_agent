@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-from transformers import TrainerCallback
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from src.utils.telemetry_logger import TelemetryLogger
 
 
-class TelemetryCallback(TrainerCallback):
+class TelemetryCallback:
     """Custom trainer callback recording loss, runtime, and GPU metrics via TelemetryLogger."""
 
     _PHASE_SFT: str = "sft"
@@ -27,12 +25,20 @@ class TelemetryCallback(TrainerCallback):
     _BYTES_PER_GIGABYTE: float = 1e9
     _DEFAULT_GLOBAL_STEP: int = 0
     _DEFAULT_EPOCH: float = 0.0
+    _EVENT_PREFIX: str = "on_"
     _SAVE_LOG_TEMPLATE: str = "Checkpoint saved at step {step}, best metric: {best_metric}"
 
     def __init__(self, logger: TelemetryLogger) -> None:
         """Initialize TelemetryCallback with telemetry recording backend."""
-        super().__init__()
         self._logger: TelemetryLogger = logger
+
+    def __getattr__(self, name: str) -> Any:
+        """Provide no-op handlers for unhandled trainer callback events."""
+        if name.startswith(self._EVENT_PREFIX):
+            return self._noop_event
+        raise AttributeError(
+            f"'{type(self).__name__}' object has no attribute '{name}'"
+        )
 
     def on_evaluate(
         self,
@@ -111,3 +117,7 @@ class TelemetryCallback(TrainerCallback):
                     payload[f"gpu_{device_idx}_memory_gb"] = allocated_gb
         except Exception:
             pass
+
+    def _noop_event(self, *args: object, **kwargs: object) -> None:
+        """No-op fallback for unused trainer callback events."""
+        return None
