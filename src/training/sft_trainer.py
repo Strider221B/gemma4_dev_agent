@@ -47,6 +47,8 @@ class SFTTrainerPipeline:
     _DTYPE_FLOAT16: str = "float16"
     _DTYPE_FLOAT32: str = "float32"
     _KW_USE_REENTRANT: str = "use_reentrant"
+    _KEY_MAX_LENGTH: str = "max_length"
+    _KEY_MAX_SEQ_LENGTH: str = "max_seq_length"
 
     def __init__(
         self,
@@ -124,7 +126,7 @@ class SFTTrainerPipeline:
         from src.training.training_config import TrainingConfigBuilder
 
         args_dict = TrainingConfigBuilder(config).build_training_args()
-        training_args = TRLSFTConfig(**args_dict)
+        training_args = self._create_trl_config(TRLSFTConfig, args_dict)
         callbacks = [
             TelemetryCallback(self._telemetry),
             EarlyStoppingCallback(
@@ -141,6 +143,15 @@ class SFTTrainerPipeline:
             callbacks=callbacks,
         )
 
+    def _create_trl_config(
+        self, config_cls: Any, args_dict: dict[str, object]
+    ) -> object:
+        """Instantiate TRL SFTConfig with version compatibility fallback."""
+        try:
+            return config_cls(**args_dict)
+        except TypeError as exc:
+            return self._handle_trl_config_error(config_cls, args_dict, exc)
+
     def _enable_gradient_checkpointing(self, model: object) -> None:
         """Enable gradient checkpointing with non-reentrant mode for memory efficiency."""
         if hasattr(model, "gradient_checkpointing_enable"):
@@ -152,6 +163,21 @@ class SFTTrainerPipeline:
         """Enable input gradients required for LoRA training with quantised models."""
         if hasattr(model, "enable_input_require_grads"):
             getattr(model, "enable_input_require_grads")()
+
+    def _handle_trl_config_error(
+        self, config_cls: Any, args_dict: dict[str, object], exc: TypeError
+    ) -> object:
+        """Fallback between max_length and max_seq_length for version compatibility."""
+        err_msg = str(exc)
+        if self._KEY_MAX_LENGTH in err_msg and self._KEY_MAX_LENGTH in args_dict:
+            fallback = dict(args_dict)
+            fallback[self._KEY_MAX_SEQ_LENGTH] = fallback.pop(self._KEY_MAX_LENGTH)
+            return config_cls(**fallback)
+        if self._KEY_MAX_SEQ_LENGTH in err_msg and self._KEY_MAX_SEQ_LENGTH in args_dict:
+            fallback = dict(args_dict)
+            fallback[self._KEY_MAX_LENGTH] = fallback.pop(self._KEY_MAX_SEQ_LENGTH)
+            return config_cls(**fallback)
+        raise exc
 
     def _load_model(self, config: ModelConfig) -> tuple[object, object]:
         """Load base language model and tokenizer using HuggingFace transformers."""

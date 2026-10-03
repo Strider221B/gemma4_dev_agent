@@ -43,7 +43,7 @@ class TrainingConfigBuilder:
             "per_device_train_batch_size": training.per_device_train_batch_size,
             "per_device_eval_batch_size": training.per_device_train_batch_size,
             "gradient_accumulation_steps": training.gradient_accumulation_steps,
-            "max_seq_length": training.max_seq_length,
+            "max_length": training.max_seq_length,
             "packing": training.packing,
         }
 
