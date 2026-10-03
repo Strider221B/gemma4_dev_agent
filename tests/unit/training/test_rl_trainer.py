@@ -29,6 +29,8 @@ class TestRLTrainerPipeline:
     _CREATED_AT: str = "2026-10-01T00:00:00Z"
     _MOCK_SIZE_BYTES: int = 500_000
     _MOCK_RESOLVED_PATH: str = "/resolved/rl/model"
+    _RESOLVED_TARGETS: list[str] = ["q_proj.linear", "v_proj.linear"]
+    _KEY_TARGET_MODULES: str = "target_modules"
 
     @pytest.fixture
     def sample_task(self) -> Task:
@@ -187,6 +189,29 @@ class TestRLTrainerPipeline:
 
             lora_model = pipeline._merge_and_reapply_lora(model, config)
             assert lora_model == mocks["model"]
+
+    def test_merge_and_reapply_lora_resolves_clippable_targets(
+        self,
+        pipeline_fixture: tuple[
+            RLTrainerPipeline, MagicMock, MagicMock, MagicMock
+        ],
+    ) -> None:
+        """Verify _merge_and_reapply_lora resolves targets and passes to PeftLoraConfig."""
+        pipeline, _, _, _ = pipeline_fixture
+        mocks = self._setup_model_mocks()
+        with patch.dict("sys.modules", mocks["modules"]):
+            config = RLConfig()
+            with patch(
+                "src.training.lora_target_resolver.LoRATargetModuleResolver.resolve"
+            ) as mock_resolve:
+                mock_resolve.return_value = self._RESOLVED_TARGETS
+                lora_model = pipeline._merge_and_reapply_lora(mocks["model"], config)
+                assert lora_model == mocks["model"]
+                mock_resolve.assert_called_once_with(
+                    mocks["model"], list(pipeline._TARGET_MODULES)
+                )
+                call_kwargs = mocks["peft"].LoraConfig.call_args.kwargs
+                assert call_kwargs[self._KEY_TARGET_MODULES] == self._RESOLVED_TARGETS
 
     def test_load_sft_model_resolves_path(
         self,

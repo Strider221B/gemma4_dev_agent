@@ -84,12 +84,15 @@ class SFTTrainerPipeline:
         from peft import LoraConfig as PeftLoraConfig
         from peft import TaskType, get_peft_model
 
+        from src.training.lora_target_resolver import LoRATargetModuleResolver
+
+        resolved_targets = LoRATargetModuleResolver().resolve(model, config.target_modules)
         bias_val: Any = config.bias
         lora_config = PeftLoraConfig(
             r=config.r,
             lora_alpha=config.lora_alpha,
             lora_dropout=config.lora_dropout,
-            target_modules=config.target_modules,
+            target_modules=resolved_targets,
             bias=bias_val,
             task_type=TaskType.CAUSAL_LM,
             use_rslora=True,

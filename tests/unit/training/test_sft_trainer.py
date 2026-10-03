@@ -22,6 +22,8 @@ class TestSFTTrainerPipeline:
     _GLOBAL_STEP: int = 200
     _ADAPTER_SIZE: int = 400_000_000
     _MOCK_RESOLVED_PATH: str = "/resolved/model/path"
+    _RESOLVED_TARGETS: list[str] = ["q_proj.linear", "v_proj.linear"]
+    _KEY_TARGET_MODULES: str = "target_modules"
 
     @pytest.fixture
     def mock_env(self, monkeypatch: pytest.MonkeyPatch) -> dict[str, MagicMock]:
@@ -32,6 +34,30 @@ class TestSFTTrainerPipeline:
         monkeypatch.setitem(sys.modules, "transformers", mocks["transformers"])
         monkeypatch.setitem(sys.modules, "torch", mocks["torch"])
         return mocks
+
+    def test_apply_lora_resolves_clippable_targets(
+        self, mock_env: dict[str, MagicMock]
+    ) -> None:
+        """Verify _apply_lora resolves target modules and passes to PeftLoraConfig."""
+        checkpoint_mgr = MagicMock()
+        telemetry = MagicMock()
+        curriculum = MagicMock()
+        pipeline = SFTTrainerPipeline(checkpoint_mgr, telemetry, curriculum)
+
+        mock_model = mock_env["model"]
+        mock_env["peft"].get_peft_model.return_value = mock_model
+        config = SFTConfig()
+
+        with patch(
+            "src.training.lora_target_resolver.LoRATargetModuleResolver.resolve"
+        ) as mock_resolve:
+            mock_resolve.return_value = self._RESOLVED_TARGETS
+            result = pipeline._apply_lora(mock_model, config.lora)
+
+            assert result is mock_model
+            mock_resolve.assert_called_once_with(mock_model, config.lora.target_modules)
+            call_kwargs = mock_env["peft"].LoraConfig.call_args.kwargs
+            assert call_kwargs[self._KEY_TARGET_MODULES] == self._RESOLVED_TARGETS
 
     def test_apply_lora_without_get_nb_trainable_parameters(
         self, mock_env: dict[str, MagicMock]
