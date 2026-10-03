@@ -144,25 +144,31 @@ class SFTTrainerPipeline:
 
     def _load_model(self, config: ModelConfig) -> tuple[object, object]:
         """Load base language model and tokenizer using HuggingFace transformers."""
-        from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+        from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
         from src.utils.model_path_resolver import ModelPathResolver
 
         resolved_path = ModelPathResolver.resolve(config.name)
-        quant_cls: Any = BitsAndBytesConfig
-        quantization_config = quant_cls(
-            load_in_4bit=config.load_in_4bit,
-            bnb_4bit_compute_dtype=self._resolve_dtype(config.dtype),
-            bnb_4bit_quant_type=self._BNB_QUANT_TYPE,
-            bnb_4bit_use_double_quant=True,
+        model_config = AutoConfig.from_pretrained(resolved_path, trust_remote_code=True)
+        has_native_quant = (
+            hasattr(model_config, "quantization_config")
+            and model_config.quantization_config is not None
         )
-        model = AutoModelForCausalLM.from_pretrained(
-            resolved_path,
-            quantization_config=quantization_config,
-            device_map=self._DEVICE_MAP,
-            trust_remote_code=True,
-            torch_dtype=self._resolve_dtype(config.dtype),
-        )
+        kwargs: dict[str, Any] = {
+            "device_map": self._DEVICE_MAP,
+            "trust_remote_code": True,
+            "torch_dtype": self._resolve_dtype(config.dtype),
+        }
+        if config.load_in_4bit and not has_native_quant:
+            quant_cls: Any = BitsAndBytesConfig
+            kwargs["quantization_config"] = quant_cls(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=self._resolve_dtype(config.dtype),
+                bnb_4bit_quant_type=self._BNB_QUANT_TYPE,
+                bnb_4bit_use_double_quant=True,
+            )
+
+        model = AutoModelForCausalLM.from_pretrained(resolved_path, **kwargs)
         tokenizer = AutoTokenizer.from_pretrained(resolved_path, trust_remote_code=True)
         return model, tokenizer
 

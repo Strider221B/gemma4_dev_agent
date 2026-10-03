@@ -21,6 +21,7 @@ class TestSFTTrainerPipeline:
     _BEST_METRIC: float = 0.38
     _GLOBAL_STEP: int = 200
     _ADAPTER_SIZE: int = 400_000_000
+    _MOCK_RESOLVED_PATH: str = "/resolved/model/path"
 
     @pytest.fixture
     def mock_env(self, monkeypatch: pytest.MonkeyPatch) -> dict[str, MagicMock]:
@@ -214,16 +215,56 @@ class TestSFTTrainerPipeline:
         config = SFTConfig()
 
         with patch("src.utils.model_path_resolver.ModelPathResolver.resolve") as mock_res:
-            mock_res.return_value = "/resolved/model/path"
+            mock_res.return_value = self._MOCK_RESOLVED_PATH
             pipeline._load_model(config.model)
             mock_res.assert_called_once_with(config.model.name)
             mock_env["transformers"].AutoModelForCausalLM.from_pretrained.assert_called_with(
-                "/resolved/model/path",
+                self._MOCK_RESOLVED_PATH,
                 quantization_config=mock_env["transformers"].BitsAndBytesConfig.return_value,
                 device_map="auto",
                 trust_remote_code=True,
                 torch_dtype=mock_env["torch"].bfloat16,
             )
+
+    def test_load_model_skips_quantization_for_prequantized_model(
+        self, mock_env: dict[str, MagicMock]
+    ) -> None:
+        """Verify _load_model omits BitsAndBytesConfig when model has native quantization."""
+        checkpoint_mgr = MagicMock()
+        telemetry = MagicMock()
+        curriculum = MagicMock()
+        pipeline = SFTTrainerPipeline(checkpoint_mgr, telemetry, curriculum)
+        config = SFTConfig()
+        mock_env["transformers"].AutoConfig.from_pretrained.return_value.quantization_config = (
+            MagicMock()
+        )
+
+        with patch("src.utils.model_path_resolver.ModelPathResolver.resolve") as mock_res:
+            mock_res.return_value = self._MOCK_RESOLVED_PATH
+            pipeline._load_model(config.model)
+            call_kwargs = (
+                mock_env["transformers"].AutoModelForCausalLM.from_pretrained.call_args.kwargs
+            )
+            assert "quantization_config" not in call_kwargs
+
+    def test_load_model_skips_quantization_when_load_in_4bit_false(
+        self, mock_env: dict[str, MagicMock]
+    ) -> None:
+        """Verify _load_model omits BitsAndBytesConfig when load_in_4bit is False."""
+        checkpoint_mgr = MagicMock()
+        telemetry = MagicMock()
+        curriculum = MagicMock()
+        pipeline = SFTTrainerPipeline(checkpoint_mgr, telemetry, curriculum)
+        config = SFTConfig()
+        config.model.load_in_4bit = False
+
+        with patch("src.utils.model_path_resolver.ModelPathResolver.resolve") as mock_res:
+            mock_res.return_value = self._MOCK_RESOLVED_PATH
+            pipeline._load_model(config.model)
+            call_kwargs = (
+                mock_env["transformers"].AutoModelForCausalLM.from_pretrained.call_args.kwargs
+            )
+            assert "quantization_config" not in call_kwargs
 
     def _build_mock_objects(self) -> dict[str, MagicMock]:
         """Construct mock instances for external training libraries."""
@@ -236,6 +277,9 @@ class TestSFTTrainerPipeline:
         mock_tokenizer = MagicMock()
         mock_tokenizer.get_vocab.return_value = vocab
 
+        mock_model_config = MagicMock()
+        mock_model_config.quantization_config = None
+        mock_transformers.AutoConfig.from_pretrained.return_value = mock_model_config
         mock_transformers.AutoModelForCausalLM.from_pretrained.return_value = mock_model
         mock_transformers.AutoTokenizer.from_pretrained.return_value = mock_tokenizer
         mock_transformers.BitsAndBytesConfig = MagicMock()

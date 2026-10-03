@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -27,6 +28,7 @@ class TestRLTrainerPipeline:
     _TEST_PATCH: str = "diff --git a/test_a.py b/test_a.py"
     _CREATED_AT: str = "2026-10-01T00:00:00Z"
     _MOCK_SIZE_BYTES: int = 500_000
+    _MOCK_RESOLVED_PATH: str = "/resolved/rl/model"
 
     @pytest.fixture
     def sample_task(self) -> Task:
@@ -170,35 +172,20 @@ class TestRLTrainerPipeline:
     ) -> None:
         """Verify SFT model loading and LoRA re-application using transformers and peft."""
         pipeline, _, _, mock_telemetry = pipeline_fixture
-        mock_transformers = MagicMock()
-        mock_peft = MagicMock()
-        mock_torch = MagicMock()
-        mock_model = MagicMock()
-        mock_tokenizer = MagicMock()
-        mock_transformers.AutoModelForCausalLM.from_pretrained.return_value = mock_model
-        mock_transformers.AutoTokenizer.from_pretrained.return_value = mock_tokenizer
-        mock_transformers.BitsAndBytesConfig = MagicMock()
-        mock_peft.get_peft_model.return_value = mock_model
-        mock_peft_inst = MagicMock()
-        mock_peft_inst.merge_and_unload.return_value = mock_model
-        mock_peft.PeftModel.from_pretrained.return_value = mock_peft_inst
-
-        with patch.dict(
-            "sys.modules",
-            {
-                "transformers": mock_transformers,
-                "peft": mock_peft,
-                "torch": mock_torch,
-            },
-        ):
+        mocks = self._setup_model_mocks()
+        with patch.dict("sys.modules", mocks["modules"]):
             config = RLConfig()
             model, tokenizer = pipeline._load_sft_model(config)
-            assert model == mock_model
-            assert tokenizer == mock_tokenizer
+            assert model == mocks["model"]
+            assert tokenizer == mocks["tokenizer"]
             mock_telemetry.log_info.assert_called_once()
+            call_kwargs = (
+                mocks["transformers"].AutoModelForCausalLM.from_pretrained.call_args.kwargs
+            )
+            assert "quantization_config" in call_kwargs
 
             lora_model = pipeline._merge_and_reapply_lora(model, config)
-            assert lora_model == mock_model
+            assert lora_model == mocks["model"]
 
     def test_load_sft_model_resolves_path(
         self,
@@ -208,21 +195,61 @@ class TestRLTrainerPipeline:
     ) -> None:
         """Verify _load_sft_model resolves model path via ModelPathResolver."""
         pipeline, _, _, _ = pipeline_fixture
-        mock_transformers, mock_peft = MagicMock(), MagicMock()
-        mock_peft.PeftModel.from_pretrained.return_value = MagicMock()
-
-        with patch.dict(
-            "sys.modules",
-            {"transformers": mock_transformers, "peft": mock_peft, "torch": MagicMock()},
-        ):
+        mocks = self._setup_model_mocks()
+        with patch.dict("sys.modules", mocks["modules"]):
             with patch(
                 "src.utils.model_path_resolver.ModelPathResolver.resolve",
-                return_value="/resolved/rl/model",
+                return_value=self._MOCK_RESOLVED_PATH,
             ) as mock_res:
                 pipeline._load_sft_model(RLConfig())
                 mock_res.assert_called_once()
-                call_args = mock_transformers.AutoModelForCausalLM.from_pretrained.call_args[0]
-                assert call_args[0] == "/resolved/rl/model"
+                call_args = mocks["transformers"].AutoModelForCausalLM.from_pretrained.call_args[0]
+                assert call_args[0] == self._MOCK_RESOLVED_PATH
+
+    def test_load_sft_model_skips_quantization_for_prequantized_model(
+        self,
+        pipeline_fixture: tuple[
+            RLTrainerPipeline, MagicMock, MagicMock, MagicMock
+        ],
+    ) -> None:
+        """Verify _load_sft_model omits BitsAndBytesConfig when native quantization exists."""
+        pipeline, _, _, _ = pipeline_fixture
+        mocks = self._setup_model_mocks()
+        mocks["transformers"].AutoConfig.from_pretrained.return_value.quantization_config = (
+            MagicMock()
+        )
+        with patch.dict("sys.modules", mocks["modules"]):
+            with patch(
+                "src.utils.model_path_resolver.ModelPathResolver.resolve",
+                return_value=self._MOCK_RESOLVED_PATH,
+            ):
+                pipeline._load_sft_model(RLConfig())
+                call_kwargs = (
+                    mocks["transformers"].AutoModelForCausalLM.from_pretrained.call_args.kwargs
+                )
+                assert "quantization_config" not in call_kwargs
+
+    def test_load_sft_model_skips_quantization_when_load_in_4bit_false(
+        self,
+        pipeline_fixture: tuple[
+            RLTrainerPipeline, MagicMock, MagicMock, MagicMock
+        ],
+    ) -> None:
+        """Verify _load_sft_model omits BitsAndBytesConfig when load_in_4bit is False."""
+        pipeline, _, _, _ = pipeline_fixture
+        mocks = self._setup_model_mocks()
+        with patch.dict("sys.modules", mocks["modules"]):
+            with patch(
+                "src.utils.model_path_resolver.ModelPathResolver.resolve",
+                return_value=self._MOCK_RESOLVED_PATH,
+            ):
+                config = RLConfig()
+                config.model.load_in_4bit = False
+                pipeline._load_sft_model(config)
+                call_kwargs = (
+                    mocks["transformers"].AutoModelForCausalLM.from_pretrained.call_args.kwargs
+                )
+                assert "quantization_config" not in call_kwargs
 
     def test_resolve_dtype_returns_expected_types(
         self,
@@ -291,3 +318,27 @@ class TestRLTrainerPipeline:
             assert adapter_path == self._MOCK_ADAPTER_PATH
             mock_trainer_inst.train.assert_called_once()
             mock_ckpt.save_adapter.assert_called_once()
+
+    def _setup_model_mocks(self) -> dict[str, Any]:
+        """Construct mock instances for transformers, peft, and torch."""
+        mock_transformers, mock_peft, mock_torch = MagicMock(), MagicMock(), MagicMock()
+        mock_model, mock_tokenizer = MagicMock(), MagicMock()
+        mock_transformers.AutoModelForCausalLM.from_pretrained.return_value = mock_model
+        mock_transformers.AutoTokenizer.from_pretrained.return_value = mock_tokenizer
+        mock_transformers.AutoConfig.from_pretrained.return_value.quantization_config = None
+        mock_transformers.BitsAndBytesConfig = MagicMock()
+        mock_peft_inst = MagicMock()
+        mock_peft_inst.merge_and_unload.return_value = mock_model
+        mock_peft.PeftModel.from_pretrained.return_value = mock_peft_inst
+        mock_peft.get_peft_model.return_value = mock_model
+        return {
+            "modules": {
+                "transformers": mock_transformers,
+                "peft": mock_peft,
+                "torch": mock_torch,
+            },
+            "transformers": mock_transformers,
+            "peft": mock_peft,
+            "model": mock_model,
+            "tokenizer": mock_tokenizer,
+        }
