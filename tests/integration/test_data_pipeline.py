@@ -21,8 +21,8 @@ class TestDataPipeline:
     )
     _VALID_COMPLEXITIES: tuple[str, ...] = ("SIMPLE", "MODERATE", "COMPLEX")
     _TOKEN_BOS: str = "<bos>"
-    _TOKEN_START: str = "<start_of_turn>"
-    _TOKEN_END: str = "<end_of_turn>"
+    _TOKEN_START: str = "<|turn>"
+    _TOKEN_END: str = "<turn|>"
     _KEY_ROLE: str = "role"
     _KEY_CONTENT: str = "content"
 

@@ -21,12 +21,20 @@ class SFTTrainerPipeline:
     _ADAPTER_SIZE_LIMIT: int = 1_500_000_000
     _MIN_EVAL_LOSS_IMPROVEMENT: float = 0.001
     _REQUIRED_SPECIAL_TOKENS: tuple[str, ...] = (
-        "<start_of_turn>",
-        "<end_of_turn>",
-        "<|tool_call|>",
-        "<|/tool_call|>",
-        "<|thought|>",
-        "<|/thought|>",
+        "<|turn>",
+        "<turn|>",
+        "<|tool>",
+        "<tool|>",
+        "<|tool_call>",
+        "<tool_call|>",
+        "<|tool_response>",
+        "<tool_response|>",
+        "<|think|>",
+        "<|channel>",
+        "<channel|>",
+        "<|image|>",
+        "<|audio|>",
+        "<|video|>",
     )
     _DEFAULT_SFT_LORA_SUBDIR: str = "sft_lora"
     _PHASE_SFT: str = "sft"

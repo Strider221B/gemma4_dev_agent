@@ -132,7 +132,8 @@ class TestRLTrainerPipeline:
             if isinstance(prompts[0], dict)
             else prompts["prompt"][0]
         )
-        assert "<start_of_turn>user" in prompt_text
+        assert "<|turn>user" in prompt_text
+        assert "<turn|>" in prompt_text
         assert sample_task.problem_statement in prompt_text
 
     def test_compute_size_delegates_to_checkpoint_manager(

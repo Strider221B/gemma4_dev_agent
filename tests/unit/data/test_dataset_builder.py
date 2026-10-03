@@ -27,8 +27,8 @@ class TestDatasetBuilder:
         "fold",
     )
     _TOKEN_BOS: str = "<bos>"
-    _TOKEN_START: str = "<start_of_turn>"
-    _TOKEN_END: str = "<end_of_turn>"
+    _TOKEN_START: str = "<|turn>"
+    _TOKEN_END: str = "<turn|>"
 
     def test_build_mock_returns_dataset(self) -> None:
         """Verify build_mock executes end-to-end and returns a non-empty dataset."""
