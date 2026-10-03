@@ -305,6 +305,65 @@ class TestSFTTrainerPipeline:
             )
             assert "quantization_config" not in call_kwargs
 
+    def test_create_trl_config_direct_success(self) -> None:
+        """Verify _create_trl_config instantiates class directly when args match."""
+        checkpoint_mgr = MagicMock()
+        telemetry = MagicMock()
+        curriculum = MagicMock()
+        pipeline = SFTTrainerPipeline(checkpoint_mgr, telemetry, curriculum)
+
+        mock_cls = MagicMock(return_value="config_instance")
+        result = pipeline._create_trl_config(mock_cls, {"max_length": 512})
+        assert result == "config_instance"
+        mock_cls.assert_called_once_with(max_length=512)
+
+    def test_create_trl_config_fallback_max_seq_length(self) -> None:
+        """Verify fallback from max_length to max_seq_length on TypeError."""
+        checkpoint_mgr = MagicMock()
+        telemetry = MagicMock()
+        curriculum = MagicMock()
+        pipeline = SFTTrainerPipeline(checkpoint_mgr, telemetry, curriculum)
+
+        mock_cls = MagicMock()
+        mock_cls.side_effect = [
+            TypeError("SFTConfig.__init__() got an unexpected keyword argument 'max_length'"),
+            "fallback_instance",
+        ]
+        result = pipeline._create_trl_config(mock_cls, {"max_length": 512, "epochs": 3})
+        assert result == "fallback_instance"
+        assert mock_cls.call_count == 2
+        mock_cls.assert_called_with(max_seq_length=512, epochs=3)
+
+    def test_create_trl_config_fallback_max_length(self) -> None:
+        """Verify fallback from max_seq_length to max_length on TypeError."""
+        checkpoint_mgr = MagicMock()
+        telemetry = MagicMock()
+        curriculum = MagicMock()
+        pipeline = SFTTrainerPipeline(checkpoint_mgr, telemetry, curriculum)
+
+        mock_cls = MagicMock()
+        mock_cls.side_effect = [
+            TypeError("SFTConfig.__init__() got an unexpected keyword argument 'max_seq_length'"),
+            "fallback_instance",
+        ]
+        result = pipeline._create_trl_config(mock_cls, {"max_seq_length": 512})
+        assert result == "fallback_instance"
+        assert mock_cls.call_count == 2
+        mock_cls.assert_called_with(max_length=512)
+
+    def test_create_trl_config_unrelated_type_error_raises(self) -> None:
+        """Verify unexpected TypeError not involving seq length is re-raised."""
+        checkpoint_mgr = MagicMock()
+        telemetry = MagicMock()
+        curriculum = MagicMock()
+        pipeline = SFTTrainerPipeline(checkpoint_mgr, telemetry, curriculum)
+
+        mock_cls = MagicMock(
+            side_effect=TypeError("unexpected keyword argument 'invalid_param'")
+        )
+        with pytest.raises(TypeError, match="invalid_param"):
+            pipeline._create_trl_config(mock_cls, {"invalid_param": 1})
+
     def _build_mock_objects(self) -> dict[str, MagicMock]:
         """Construct mock instances for external training libraries."""
         mock_peft, mock_trl, mock_transformers = MagicMock(), MagicMock(), MagicMock()

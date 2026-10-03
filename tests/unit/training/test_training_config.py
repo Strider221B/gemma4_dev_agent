@@ -26,6 +26,8 @@ class TestTrainingConfigBuilder:
         assert "save_strategy" in args
         assert "logging_steps" in args
         assert "seed" in args
+        assert "max_length" in args
+        assert args["max_length"] == config.training.max_seq_length
         assert args["optim"] == "adamw_8bit"
         assert args["report_to"] == "none"
 
