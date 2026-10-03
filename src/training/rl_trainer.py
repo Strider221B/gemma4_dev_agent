@@ -154,12 +154,15 @@ class RLTrainerPipeline:
         from peft import LoraConfig as PeftLoraConfig
         from peft import TaskType, get_peft_model
 
+        from src.training.lora_target_resolver import LoRATargetModuleResolver
+
         lora_r = getattr(config.grpo, "lora_r", self._DEFAULT_LORA_R)
+        resolved_targets = LoRATargetModuleResolver().resolve(model, list(self._TARGET_MODULES))
         lora_config = PeftLoraConfig(
             r=lora_r,
             lora_alpha=self._DEFAULT_LORA_ALPHA,
             lora_dropout=self._DEFAULT_LORA_DROPOUT,
-            target_modules=list(self._TARGET_MODULES),
+            target_modules=resolved_targets,
             task_type=TaskType.CAUSAL_LM,
         )
         self._enable_input_grads(model)
