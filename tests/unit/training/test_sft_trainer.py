@@ -191,10 +191,23 @@ class TestSFTTrainerPipeline:
         pipeline = SFTTrainerPipeline(checkpoint_mgr, telemetry, curriculum)
 
         mock_tokenizer = MagicMock()
-        mock_tokenizer.get_vocab.return_value = {"<start_of_turn>": 1}
+        mock_tokenizer.get_vocab.return_value = {"<|turn>": 1}
 
         with pytest.raises(ValueError, match="Missing required special token"):
             pipeline._verify_special_tokens(mock_tokenizer)
+
+    def test_verify_special_tokens_with_all_tokens_succeeds(self) -> None:
+        """Verify _verify_special_tokens passes when all Gemma 4 tokens are present."""
+        checkpoint_mgr = MagicMock()
+        telemetry = MagicMock()
+        curriculum = MagicMock()
+        pipeline = SFTTrainerPipeline(checkpoint_mgr, telemetry, curriculum)
+
+        mock_tokenizer = MagicMock()
+        mock_tokenizer.get_vocab.return_value = {
+            tok: idx for idx, tok in enumerate(SFTTrainerPipeline._REQUIRED_SPECIAL_TOKENS)
+        }
+        pipeline._verify_special_tokens(mock_tokenizer)
 
     def test_verify_special_tokens_without_get_vocab_method(self) -> None:
         """Verify tokenizer without get_vocab raises ValueError for missing tokens."""

@@ -36,8 +36,12 @@ class RolloutGenerator:
     _RESULT_LIST: str = "Directory entries listed."
     _RESULT_SUBMIT: str = "Patch submitted."
     _RESULT_DEFAULT_PREFIX: str = "Tool executed: "
-    _THOUGHT_PATTERN: str = r"<\|thought\|>(.*?)<\|/thought\|>"
-    _TOOL_CALL_PATTERN: str = r"<\|tool_call\|>(.*?)<\|/tool_call\|>"
+    _THOUGHT_PATTERN: str = (
+        r"(?:<\|channel>thought|<\|thought\|>)(.*?)(?:<channel\|>|<\|/thought\|>)"
+    )
+    _TOOL_CALL_PATTERN: str = (
+        r"(?:<\|tool_call>|<\|tool_call\|>)(.*?)(?:<tool_call\|>|<\|/tool_call\|>)"
+    )
     _PATCH_TAG_PATTERN: str = r"<patch>(.*?)</patch>"
     _DIFF_PATTERN: str = r"(diff --git.*?)(?=\Z)"
     _CHARS_PER_TOKEN: int = 4

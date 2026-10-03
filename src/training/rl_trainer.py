@@ -48,6 +48,7 @@ class RLTrainerPipeline:
     _DTYPE_FLOAT32: str = "float32"
     _KW_USE_REENTRANT: str = "use_reentrant"
     _MSG_ADAPTER_MERGED: str = "SFT adapter merged into base model"
+    _PROMPT_TEMPLATE: str = "<|turn>user\nProblem: {problem}\n<turn|>\n"
 
     def __init__(
         self,
@@ -85,7 +86,7 @@ class RLTrainerPipeline:
         """Format task statements into prompt dictionary dataset for RL training."""
         prompt_records: list[dict[str, str]] = [
             {
-                "prompt": f"<start_of_turn>user\nProblem: {t.problem_statement}\n<end_of_turn>\n",
+                "prompt": self._PROMPT_TEMPLATE.format(problem=t.problem_statement),
                 "instance_id": t.instance_id,
             }
             for t in tasks

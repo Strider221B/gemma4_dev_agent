@@ -35,12 +35,12 @@ class TestChatFormatter:
     _SAMPLE_TOKEN_COUNT: int = 42
     _CUSTOM_MAX_TOKENS: int = 16384
     _BOS: str = "<bos>"
-    _START_TURN: str = "<start_of_turn>"
-    _END_TURN: str = "<end_of_turn>"
-    _TOOL_OPEN: str = "<|tool_call|>"
-    _TOOL_CLOSE: str = "<|/tool_call|>"
-    _THOUGHT_OPEN: str = "<|thought|>"
-    _THOUGHT_CLOSE: str = "<|/thought|>"
+    _START_TURN: str = "<|turn>"
+    _END_TURN: str = "<turn|>"
+    _TOOL_OPEN: str = "<|tool_call>"
+    _TOOL_CLOSE: str = "<tool_call|>"
+    _THOUGHT_OPEN: str = "<|channel>thought"
+    _THOUGHT_CLOSE: str = "<channel|>"
     _KEY_ROLE: str = "role"
     _KEY_CONTENT: str = "content"
 

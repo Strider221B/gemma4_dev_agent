@@ -21,8 +21,8 @@ class PreferencePairGenerator:
     _KEY_REJECTED: str = "rejected"
     _KEY_CHOSEN_SCORE: str = "chosen_score"
     _KEY_REJECTED_SCORE: str = "rejected_score"
-    _PROMPT_TEMPLATE: str = "<start_of_turn>user\nProblem: {problem}\n<end_of_turn>\n"
-    _THOUGHT_WRAPPER: str = "<|thought|>\n{content}\n<|/thought|>"
+    _PROMPT_TEMPLATE: str = "<|turn>user\nProblem: {problem}\n<turn|>\n"
+    _THOUGHT_WRAPPER: str = "<|channel>thought\n{content}\n<channel|>"
     _JOIN_NEWLINE: str = "\n"
 
     def __init__(
