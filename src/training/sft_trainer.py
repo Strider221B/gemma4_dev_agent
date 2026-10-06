@@ -49,6 +49,7 @@ class SFTTrainerPipeline:
     _KW_USE_REENTRANT: str = "use_reentrant"
     _KEY_MAX_LENGTH: str = "max_length"
     _KEY_MAX_SEQ_LENGTH: str = "max_seq_length"
+    _KEY_WARMUP_RATIO: str = "warmup_ratio"
 
     def __init__(
         self,
@@ -109,6 +110,20 @@ class SFTTrainerPipeline:
         """Compute total size of adapter directory via CheckpointManager."""
         return self._checkpoint_mgr._compute_total_size(path)
 
+    def _build_callbacks(self) -> list[Any]:
+        """Construct telemetry and early stopping callbacks for trainer."""
+        from transformers import EarlyStoppingCallback
+
+        from src.training.callback_handler import TelemetryCallback
+
+        return [
+            TelemetryCallback(self._telemetry),
+            EarlyStoppingCallback(
+                early_stopping_patience=self._EARLY_STOPPING_PATIENCE,
+                early_stopping_threshold=self._MIN_EVAL_LOSS_IMPROVEMENT,
+            ),
+        ]
+
     def _create_trainer(
         self,
         model: object,
@@ -118,30 +133,41 @@ class SFTTrainerPipeline:
         config: SFTConfig,
     ) -> object:
         """Build and configure TRL SFTTrainer with callbacks and hyperparameters."""
-        from transformers import EarlyStoppingCallback
-        from trl import SFTConfig as TRLSFTConfig
-        from trl import SFTTrainer
+        import trl
 
-        from src.training.callback_handler import TelemetryCallback
         from src.training.training_config import TrainingConfigBuilder
 
+        sft_config_cls: Any = getattr(trl, "SFTConfig")
+        sft_trainer_cls: Any = getattr(trl, "SFTTrainer")
         args_dict = TrainingConfigBuilder(config).build_training_args()
-        training_args = self._create_trl_config(TRLSFTConfig, args_dict)
-        callbacks = [
-            TelemetryCallback(self._telemetry),
-            EarlyStoppingCallback(
-                early_stopping_patience=self._EARLY_STOPPING_PATIENCE,
-                early_stopping_threshold=self._MIN_EVAL_LOSS_IMPROVEMENT,
-            ),
-        ]
-        return SFTTrainer(
-            model=model,
-            tokenizer=tokenizer,
-            train_dataset=train_ds,
-            eval_dataset=val_ds,
-            args=training_args,
-            callbacks=callbacks,
+        training_args = self._create_trl_config(sft_config_cls, args_dict)
+        callbacks = self._build_callbacks()
+        return self._instantiate_trainer(
+            sft_trainer_cls, model, tokenizer, train_ds, val_ds, training_args, callbacks
         )
+
+    def _instantiate_trainer(
+        self,
+        trainer_cls: Any,
+        model: object,
+        tokenizer: object,
+        train_ds: object,
+        val_ds: object,
+        args: object,
+        callbacks: list[Any],
+    ) -> object:
+        """Instantiate SFTTrainer with version-dependent tokenizer parameter."""
+        kwargs: dict[str, Any] = {
+            "model": model,
+            "train_dataset": train_ds,
+            "eval_dataset": val_ds,
+            "args": args,
+            "callbacks": callbacks,
+        }
+        try:
+            return trainer_cls(tokenizer=tokenizer, **kwargs)
+        except TypeError:
+            return trainer_cls(processing_class=tokenizer, **kwargs)
 
     def _create_trl_config(
         self, config_cls: Any, args_dict: dict[str, object]
@@ -177,6 +203,10 @@ class SFTTrainerPipeline:
             fallback = dict(args_dict)
             fallback[self._KEY_MAX_LENGTH] = fallback.pop(self._KEY_MAX_SEQ_LENGTH)
             return config_cls(**fallback)
+        if self._KEY_WARMUP_RATIO in err_msg and self._KEY_WARMUP_RATIO in args_dict:
+            fallback = dict(args_dict)
+            fallback.pop(self._KEY_WARMUP_RATIO)
+            return self._create_trl_config(config_cls, fallback)
         raise exc
 
     def _load_model(self, config: ModelConfig) -> tuple[object, object]:

@@ -351,6 +351,23 @@ class TestSFTTrainerPipeline:
         assert mock_cls.call_count == 2
         mock_cls.assert_called_with(max_length=512)
 
+    def test_create_trl_config_fallback_warmup_ratio(self) -> None:
+        """Verify fallback pops warmup_ratio on TypeError."""
+        checkpoint_mgr = MagicMock()
+        telemetry = MagicMock()
+        curriculum = MagicMock()
+        pipeline = SFTTrainerPipeline(checkpoint_mgr, telemetry, curriculum)
+
+        mock_cls = MagicMock()
+        mock_cls.side_effect = [
+            TypeError("SFTConfig.__init__() got an unexpected keyword argument 'warmup_ratio'"),
+            "fallback_instance",
+        ]
+        result = pipeline._create_trl_config(mock_cls, {"warmup_ratio": 0.05, "lr": 1e-4})
+        assert result == "fallback_instance"
+        assert mock_cls.call_count == 2
+        mock_cls.assert_called_with(lr=1e-4)
+
     def test_create_trl_config_unrelated_type_error_raises(self) -> None:
         """Verify unexpected TypeError not involving seq length is re-raised."""
         checkpoint_mgr = MagicMock()

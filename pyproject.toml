@@ -53,6 +53,7 @@ packages = ["src"]
 [[tool.mypy.overrides]]
 module = [
     "bitsandbytes.*",
+    "trl",
     "trl.*",
     "peft.*",
     "transformers.*",
@@ -62,6 +63,8 @@ module = [
     "safetensors.*",
     "torch.*",
     "yaml.*",
+    "tokenizers",
+    "tokenizers.*",
 ]
 ignore_missing_imports = true
 

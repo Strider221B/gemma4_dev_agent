@@ -184,17 +184,12 @@ class RLTrainerPipeline:
         except ImportError:
             return dtype_str
 
-    def _train_dpo(
-        self, model: object, tokenizer: object, prompts: object, config: RLConfig
-    ) -> str:
-        """Execute DPO preference training on pairwise ranked trajectories."""
-        from trl import DPOConfig as TRLDPOConfig
-        from trl import DPOTrainer
+    def _build_dpo_args(self, config: RLConfig, output_dir: str) -> object:
+        """Construct arguments for DPOTrainer."""
+        import trl
 
-        from src.training.callback_handler import TelemetryCallback
-
-        output_dir = str(Path(config.output_dir) / self._SUBDIR_DPO_CHECKPOINTS)
-        dpo_args = TRLDPOConfig(
+        dpo_config_cls: Any = getattr(trl, "DPOConfig")
+        return dpo_config_cls(
             output_dir=output_dir,
             beta=config.dpo.beta,
             loss_type=config.dpo.loss_type,
@@ -211,31 +206,38 @@ class RLTrainerPipeline:
             save_total_limit=2,
             seed=self._DEFAULT_RANDOM_STATE,
         )
-        trainer = DPOTrainer(
+
+    def _train_dpo(
+        self, model: object, tokenizer: object, prompts: object, config: RLConfig
+    ) -> str:
+        """Execute DPO preference training on pairwise ranked trajectories."""
+        import trl
+
+        from src.training.callback_handler import TelemetryCallback
+
+        output_dir = str(Path(config.output_dir) / self._SUBDIR_DPO_CHECKPOINTS)
+        dpo_args = self._build_dpo_args(config, output_dir)
+        dpo_trainer_cls: Any = getattr(trl, "DPOTrainer")
+        callbacks: list[Any] = [TelemetryCallback(self._telemetry)]
+        trainer = dpo_trainer_cls(
             model=model,
             ref_model=None,
             tokenizer=tokenizer,
             args=dpo_args,
             train_dataset=prompts,
-            callbacks=[TelemetryCallback(self._telemetry)],
+            callbacks=callbacks,
         )
         if hasattr(trainer, "train"):
             trainer.train()
         adapter_dir = str(Path(config.output_dir) / self._SUBDIR_RL_LORA)
         return self._checkpoint_mgr.save_adapter(model, adapter_dir)
 
-    def _train_grpo(
-        self, model: object, tokenizer: object, prompts: object, config: RLConfig
-    ) -> str:
-        """Execute GRPO policy optimization with multi-signal reward feedback."""
-        from trl import GRPOConfig as TRLGRPOConfig
-        from trl import GRPOTrainer
+    def _build_grpo_args(self, config: RLConfig, output_dir: str) -> object:
+        """Construct arguments for GRPOTrainer."""
+        import trl
 
-        from src.training.callback_handler import TelemetryCallback
-        from src.training.rl_early_stopping import RLEarlyStoppingCallback
-
-        output_dir = str(Path(config.output_dir) / self._SUBDIR_GRPO_CHECKPOINTS)
-        grpo_args = TRLGRPOConfig(
+        grpo_config_cls: Any = getattr(trl, "GRPOConfig")
+        return grpo_config_cls(
             output_dir=output_dir,
             num_generations=config.grpo.num_generations,
             max_new_tokens=config.grpo.max_new_tokens,
@@ -257,17 +259,31 @@ class RLTrainerPipeline:
             save_total_limit=2,
             seed=self._DEFAULT_RANDOM_STATE,
         )
-        callbacks = [
+
+    def _train_grpo(
+        self, model: object, tokenizer: object, prompts: object, config: RLConfig
+    ) -> str:
+        """Execute GRPO policy optimization with multi-signal reward feedback."""
+        import trl
+
+        from src.training.callback_handler import TelemetryCallback
+        from src.training.rl_early_stopping import RLEarlyStoppingCallback
+
+        output_dir = str(Path(config.output_dir) / self._SUBDIR_GRPO_CHECKPOINTS)
+        grpo_args = self._build_grpo_args(config, output_dir)
+        callbacks: list[Any] = [
             TelemetryCallback(self._telemetry),
             RLEarlyStoppingCallback(
                 min_reward_improvement=self._DEFAULT_MIN_REWARD_IMPROVEMENT,
                 patience=self._DEFAULT_PATIENCE,
             ),
         ]
-        trainer = GRPOTrainer(
+        grpo_trainer_cls: Any = getattr(trl, "GRPOTrainer")
+        reward_funcs: list[Any] = [self._reward_model.compute_reward]
+        trainer = grpo_trainer_cls(
             model=model,
             tokenizer=tokenizer,
-            reward_funcs=[self._reward_model.compute_reward],
+            reward_funcs=reward_funcs,
             args=grpo_args,
             train_dataset=prompts,
             callbacks=callbacks,
