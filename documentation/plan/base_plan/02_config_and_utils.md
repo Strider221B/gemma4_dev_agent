@@ -10,7 +10,7 @@
 ## Pre-Requisites
 
 - Epic 0 is complete (all directories exist, `pyproject.toml` installed)
-- Activate environment: `source ~/python_envs/p313_llm/bin/activate`
+- Activate environment: `source ~/python_envs/p312_kaggle/bin/activate`
 
 ---
 
@@ -389,7 +389,7 @@ Create `/home/somesh/git_repos/gemma4_dev_agent/configs/eval_config.yaml` with c
 ## Task 1.10: Run CI Checks
 
 ```bash
-source ~/python_envs/p313_llm/bin/activate
+source ~/python_envs/p312_kaggle/bin/activate
 cd /home/somesh/git_repos/gemma4_dev_agent
 
 ruff check src/ tests/

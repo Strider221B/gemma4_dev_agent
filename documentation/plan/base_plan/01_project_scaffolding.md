@@ -10,7 +10,7 @@
 ## Pre-Requisites
 
 ```bash
-source ~/python_envs/p313_llm/bin/activate
+source ~/python_envs/p312_kaggle/bin/activate
 cd /home/somesh/git_repos/gemma4_dev_agent
 ```
 
@@ -207,7 +207,7 @@ import pytest
 ## Task 0.6: Install Package in Editable Mode
 
 ```bash
-source ~/python_envs/p313_llm/bin/activate
+source ~/python_envs/p312_kaggle/bin/activate
 cd /home/somesh/git_repos/gemma4_dev_agent
 pip install -e ".[dev]"
 ```
@@ -217,7 +217,7 @@ pip install -e ".[dev]"
 ## Task 0.7: Install Linting/Type-Checking Tools
 
 ```bash
-source ~/python_envs/p313_llm/bin/activate
+source ~/python_envs/p312_kaggle/bin/activate
 pip install ruff mypy pytest pytest-cov pytest-mock pydantic
 ```
 
@@ -228,7 +228,7 @@ pip install ruff mypy pytest pytest-cov pytest-mock pydantic
 Run these commands and confirm zero errors:
 
 ```bash
-source ~/python_envs/p313_llm/bin/activate
+source ~/python_envs/p312_kaggle/bin/activate
 cd /home/somesh/git_repos/gemma4_dev_agent
 
 # Should pass with no files to check yet

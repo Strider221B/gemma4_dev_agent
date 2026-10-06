@@ -84,11 +84,11 @@ gemma4_dev_agent/
 ### Step 1: Activate Environment
 ```bash
 # Using the preconfigured virtual environment:
-source ~/python_envs/p313_llm/bin/activate
+source ~/python_envs/p312_kaggle/bin/activate
 
 # Or create a new virtual environment using uv:
 uv venv ~/python_envs/p313_llm --python 3.13
-source ~/python_envs/p313_llm/bin/activate
+source ~/python_envs/p312_kaggle/bin/activate
 ```
 
 ### Step 2: Install in Editable Mode

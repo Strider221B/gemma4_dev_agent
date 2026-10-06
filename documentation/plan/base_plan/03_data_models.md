@@ -10,7 +10,7 @@
 ## Pre-Requisites
 
 - Epic 1 is complete
-- Activate environment: `source ~/python_envs/p313_llm/bin/activate`
+- Activate environment: `source ~/python_envs/p312_kaggle/bin/activate`
 
 ---
 
@@ -317,7 +317,7 @@ class OverfittingSignal(Enum):
 ## Task 2.13: Run CI
 
 ```bash
-source ~/python_envs/p313_llm/bin/activate
+source ~/python_envs/p312_kaggle/bin/activate
 cd /home/somesh/git_repos/gemma4_dev_agent
 
 ruff check src/ tests/

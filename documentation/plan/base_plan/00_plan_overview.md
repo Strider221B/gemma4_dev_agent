@@ -9,7 +9,7 @@
 
 ```bash
 # Python environment — use this for ALL commands
-source ~/python_envs/p313_llm/bin/activate
+source ~/python_envs/p312_kaggle/bin/activate
 
 # Working directory
 cd /home/somesh/git_repos/gemma4_dev_agent
@@ -116,7 +116,7 @@ Every epic is complete when ALL of these pass:
 
 ```bash
 # Activate env
-source ~/python_envs/p313_llm/bin/activate
+source ~/python_envs/p312_kaggle/bin/activate
 
 # 1. Lint
 cd /home/somesh/git_repos/gemma4_dev_agent && ruff check src/ tests/
