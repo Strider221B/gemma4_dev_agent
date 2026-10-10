@@ -166,7 +166,7 @@ You can use `VersionManager` or the Kaggle CLI directly:
 kaggle datasets create -p kaggle_staging/ --dir-mode zip
 
 # Or bump version and push new release:
-kaggle datasets version -p kaggle_staging/ --dir-mode zip -m "v0.1.0: update pipeline and training notebook"
+kaggle datasets version -p kaggle_staging/ --dir-mode zip -m ""
 ```
 
 ---
