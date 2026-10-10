@@ -92,7 +92,9 @@ class SFTTrainerPipeline:
         from peft import TaskType, get_peft_model
 
         from src.training.lora_target_resolver import LoRATargetModuleResolver
+        from src.training.peft_model_patcher import PEFTModelPatcher
 
+        PEFTModelPatcher().patch_peft_lora_class()
         resolved_targets = LoRATargetModuleResolver().resolve(model, config.target_modules)
         bias_val: Any = config.bias
         lora_config = PeftLoraConfig(
@@ -106,6 +108,7 @@ class SFTTrainerPipeline:
         )
         self._enable_input_grads(model)
         lora_model = get_peft_model(cast(Any, model), lora_config)
+        PEFTModelPatcher().patch_model(lora_model)
         self._enable_gradient_checkpointing(lora_model)
         self._log_trainable_params(lora_model)
         return lora_model

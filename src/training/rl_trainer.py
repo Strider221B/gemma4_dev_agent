@@ -203,7 +203,9 @@ class RLTrainerPipeline:
         from peft import TaskType, get_peft_model
 
         from src.training.lora_target_resolver import LoRATargetModuleResolver
+        from src.training.peft_model_patcher import PEFTModelPatcher
 
+        PEFTModelPatcher().patch_peft_lora_class()
         lora_r = getattr(config.grpo, "lora_r", self._DEFAULT_LORA_R)
         resolved_targets = LoRATargetModuleResolver().resolve(model, list(self._TARGET_MODULES))
         lora_config = PeftLoraConfig(
@@ -215,6 +217,7 @@ class RLTrainerPipeline:
         )
         self._enable_input_grads(model)
         lora_model = get_peft_model(cast(Any, model), lora_config)
+        PEFTModelPatcher().patch_model(lora_model)
         self._enable_gradient_checkpointing(lora_model)
         return lora_model
 
