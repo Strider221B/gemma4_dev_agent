@@ -50,6 +50,10 @@ class SFTTrainerPipeline:
     _KEY_MAX_LENGTH: str = "max_length"
     _KEY_MAX_SEQ_LENGTH: str = "max_seq_length"
     _KEY_WARMUP_RATIO: str = "warmup_ratio"
+    _KEY_DEQUANTIZE: str = "dequantize"
+    _KEY_QUANT_CONFIG: str = "quantization_config"
+    _KEY_QUANT_METHOD: str = "quant_method"
+    _METHOD_COMPRESSED_TENSORS: str = "compressed-tensors"
 
     def __init__(
         self,
@@ -211,33 +215,77 @@ class SFTTrainerPipeline:
 
     def _load_model(self, config: ModelConfig) -> tuple[object, object]:
         """Load base language model and tokenizer using HuggingFace transformers."""
-        from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+        from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
         from src.utils.model_path_resolver import ModelPathResolver
 
         resolved_path = ModelPathResolver.resolve(config.name)
         model_config = AutoConfig.from_pretrained(resolved_path, trust_remote_code=True)
-        has_native_quant = (
-            hasattr(model_config, "quantization_config")
-            and model_config.quantization_config is not None
-        )
         kwargs: dict[str, Any] = {
             "device_map": self._DEVICE_MAP,
             "trust_remote_code": True,
             "torch_dtype": self._resolve_dtype(config.dtype),
         }
-        if config.load_in_4bit and not has_native_quant:
-            quant_cls: Any = BitsAndBytesConfig
-            kwargs["quantization_config"] = quant_cls(
-                load_in_4bit=True,
-                bnb_4bit_compute_dtype=self._resolve_dtype(config.dtype),
-                bnb_4bit_quant_type=self._BNB_QUANT_TYPE,
-                bnb_4bit_use_double_quant=True,
-            )
+        quant_config = self._build_quantization_config(
+            model_config, config.load_in_4bit, config.dtype
+        )
+        if quant_config is not None:
+            kwargs[self._KEY_QUANT_CONFIG] = quant_config
 
         model = AutoModelForCausalLM.from_pretrained(resolved_path, **kwargs)
         tokenizer = AutoTokenizer.from_pretrained(resolved_path, trust_remote_code=True)
         return model, tokenizer
+
+    def _build_quantization_config(
+        self, model_config: object, load_in_4bit: bool, dtype_str: str
+    ) -> object | None:
+        """Resolve quantization config: dequantize compressed-tensors or apply BitsAndBytes."""
+        quant_cfg = getattr(model_config, self._KEY_QUANT_CONFIG, None)
+        if quant_cfg is not None:
+            if self._is_compressed_tensors(quant_cfg):
+                return self._create_dequantize_config(quant_cfg)
+            return None
+        if load_in_4bit:
+            return self._create_bnb_config(dtype_str)
+        return None
+
+    def _create_bnb_config(self, dtype_str: str) -> object:
+        """Construct BitsAndBytesConfig for 4-bit QLoRA training."""
+        from transformers import BitsAndBytesConfig
+
+        quant_cls: Any = BitsAndBytesConfig
+        return quant_cls(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=self._resolve_dtype(dtype_str),
+            bnb_4bit_quant_type=self._BNB_QUANT_TYPE,
+            bnb_4bit_use_double_quant=True,
+        )
+
+    def _create_dequantize_config(self, quant_cfg: object) -> object:
+        """Create CompressedTensorsConfig with dequantize enabled for training."""
+        from transformers import CompressedTensorsConfig
+
+        if isinstance(quant_cfg, dict):
+            cfg_dict = dict(quant_cfg)
+            cfg_dict[self._KEY_DEQUANTIZE] = True
+            return CompressedTensorsConfig(**cfg_dict)
+        if hasattr(quant_cfg, "to_dict"):
+            cfg_dict = getattr(quant_cfg, "to_dict")()
+            cfg_dict[self._KEY_DEQUANTIZE] = True
+            return CompressedTensorsConfig(**cfg_dict)
+        if hasattr(quant_cfg, self._KEY_DEQUANTIZE):
+            setattr(quant_cfg, self._KEY_DEQUANTIZE, True)
+            return quant_cfg
+        return CompressedTensorsConfig(dequantize=True)
+
+    def _is_compressed_tensors(self, quant_cfg: object) -> bool:
+        """Check whether quantization configuration uses compressed-tensors method."""
+        if isinstance(quant_cfg, dict):
+            return quant_cfg.get(self._KEY_QUANT_METHOD) == self._METHOD_COMPRESSED_TENSORS
+        method = getattr(quant_cfg, self._KEY_QUANT_METHOD, None)
+        if method == self._METHOD_COMPRESSED_TENSORS:
+            return True
+        return self._METHOD_COMPRESSED_TENSORS in str(type(quant_cfg)).lower()
 
     def _log_trainable_params(self, model: object) -> None:
         """Log trainable vs total parameter counts from PEFT model."""

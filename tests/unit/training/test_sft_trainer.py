@@ -268,14 +268,13 @@ class TestSFTTrainerPipeline:
     def test_load_model_skips_quantization_for_prequantized_model(
         self, mock_env: dict[str, MagicMock]
     ) -> None:
-        """Verify _load_model omits BitsAndBytesConfig when model has native quantization."""
-        checkpoint_mgr = MagicMock()
-        telemetry = MagicMock()
-        curriculum = MagicMock()
-        pipeline = SFTTrainerPipeline(checkpoint_mgr, telemetry, curriculum)
+        """Verify _load_model omits BitsAndBytesConfig when native non-ct quant exists."""
+        pipeline = SFTTrainerPipeline(MagicMock(), MagicMock(), MagicMock())
         config = SFTConfig()
+        mock_quant = MagicMock()
+        mock_quant.quant_method = "awq"
         mock_env["transformers"].AutoConfig.from_pretrained.return_value.quantization_config = (
-            MagicMock()
+            mock_quant
         )
 
         with patch("src.utils.model_path_resolver.ModelPathResolver.resolve") as mock_res:
@@ -285,6 +284,72 @@ class TestSFTTrainerPipeline:
                 mock_env["transformers"].AutoModelForCausalLM.from_pretrained.call_args.kwargs
             )
             assert "quantization_config" not in call_kwargs
+
+    def test_load_model_applies_dequantize_for_compressed_tensors_dict(
+        self, mock_env: dict[str, MagicMock]
+    ) -> None:
+        """Verify _load_model configures dequantize for compressed-tensors dict."""
+        pipeline = SFTTrainerPipeline(MagicMock(), MagicMock(), MagicMock())
+        config = SFTConfig()
+        mock_env["transformers"].AutoConfig.from_pretrained.return_value.quantization_config = {
+            "quant_method": "compressed-tensors",
+            "format": "pack-quantized",
+        }
+
+        with patch("src.utils.model_path_resolver.ModelPathResolver.resolve") as mock_res:
+            mock_res.return_value = self._MOCK_RESOLVED_PATH
+            pipeline._load_model(config.model)
+            call_kwargs = (
+                mock_env["transformers"].AutoModelForCausalLM.from_pretrained.call_args.kwargs
+            )
+            assert "quantization_config" in call_kwargs
+            mock_env["transformers"].CompressedTensorsConfig.assert_called_once_with(
+                quant_method="compressed-tensors",
+                format="pack-quantized",
+                dequantize=True,
+            )
+
+    def test_load_model_applies_dequantize_for_compressed_tensors_object(
+        self, mock_env: dict[str, MagicMock]
+    ) -> None:
+        """Verify _load_model configures dequantize for compressed-tensors object."""
+        pipeline = SFTTrainerPipeline(MagicMock(), MagicMock(), MagicMock())
+        config = SFTConfig()
+        quant_obj = MagicMock()
+        quant_obj.quant_method = "compressed-tensors"
+        quant_obj.to_dict.return_value = {"quant_method": "compressed-tensors"}
+        mock_env["transformers"].AutoConfig.from_pretrained.return_value.quantization_config = (
+            quant_obj
+        )
+
+        with patch("src.utils.model_path_resolver.ModelPathResolver.resolve") as mock_res:
+            mock_res.return_value = self._MOCK_RESOLVED_PATH
+            pipeline._load_model(config.model)
+            call_kwargs = (
+                mock_env["transformers"].AutoModelForCausalLM.from_pretrained.call_args.kwargs
+            )
+            assert "quantization_config" in call_kwargs
+
+    def test_load_model_applies_dequantize_for_compressed_tensors_attr_only(
+        self, mock_env: dict[str, MagicMock]
+    ) -> None:
+        """Verify _load_model mutates dequantize when object has attribute but no to_dict."""
+        pipeline = SFTTrainerPipeline(MagicMock(), MagicMock(), MagicMock())
+        config = SFTConfig()
+        quant_obj = MagicMock(spec=["quant_method", "dequantize"])
+        quant_obj.quant_method = "compressed-tensors"
+        quant_obj.dequantize = False
+        mock_env["transformers"].AutoConfig.from_pretrained.return_value.quantization_config = (
+            quant_obj
+        )
+
+        with patch("src.utils.model_path_resolver.ModelPathResolver.resolve") as mock_res:
+            mock_res.return_value = self._MOCK_RESOLVED_PATH
+            pipeline._load_model(config.model)
+            call_kwargs = (
+                mock_env["transformers"].AutoModelForCausalLM.from_pretrained.call_args.kwargs
+            )
+            assert call_kwargs["quantization_config"].dequantize is True
 
     def test_load_model_skips_quantization_when_load_in_4bit_false(
         self, mock_env: dict[str, MagicMock]
@@ -398,6 +463,7 @@ class TestSFTTrainerPipeline:
         mock_transformers.AutoModelForCausalLM.from_pretrained.return_value = mock_model
         mock_transformers.AutoTokenizer.from_pretrained.return_value = mock_tokenizer
         mock_transformers.BitsAndBytesConfig = MagicMock()
+        mock_transformers.CompressedTensorsConfig = MagicMock()
 
         mock_peft.get_peft_model.return_value = mock_model
         mock_peft.LoraConfig = MagicMock()
