@@ -95,7 +95,7 @@ build-backend = "setuptools.backends._legacy:_Backend"
 name = "swegemma-agent"
 version = "0.1.0"
 description = "Post-training pipeline for gemma-4-31b-it-qat-w4a16-ct as an autonomous SWE agent"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
     "pyyaml>=6.0",
     "pydantic>=2.0",
@@ -128,7 +128,7 @@ include = ["src*"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py313"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I"]

@@ -78,7 +78,7 @@ gemma4_dev_agent/
 
 ### Prerequisites
 - Linux OS (Ubuntu 22.04+ or WSL2 recommended)
-- Python 3.13+
+- Python 3.12+
 - `uv` (recommended) or standard `pip`
 
 ### Step 1: Activate Environment
@@ -87,7 +87,7 @@ gemma4_dev_agent/
 source ~/python_envs/p312_kaggle/bin/activate
 
 # Or create a new virtual environment using uv:
-uv venv ~/python_envs/p313_llm --python 3.13
+uv venv ~/python_envs/p312_kaggle --python 3.12
 source ~/python_envs/p312_kaggle/bin/activate
 ```
 

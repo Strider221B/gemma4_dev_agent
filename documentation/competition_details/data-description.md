@@ -47,10 +47,10 @@ uation.
 
 **docker/** Container build specifications and Python standard library compatibility shims used to build the local `swebench-sandbox:latest` image:
 
-*   `Dockerfile.sandbox` - base sandbox container specification providing Python 3.13, `git`, `pytest`, and build backends (`setuptools`, `hatchling`, `flit-core`, `poetry-core`, `pdm-backend`).
+*   `Dockerfile.sandbox` - base sandbox container specification providing Python 3.12, `git`, `pytest`, and build backends (`setuptools`, `hatchling`, `flit-core`, `poetry-core`, `pdm-backend`).
 *   `Dockerfile.public` - public development container variant pre-configured for the 129 open-source tasks.
-*   `imp.py` - compatibility shim restoring the legacy `imp` module removed in Python 3.13 for older test suites.
-*   `telnetlib.py` - compatibility shim restoring the legacy `telnetlib` module removed in Python 3.13.
+*   `imp.py` - compatibility shim restoring the legacy `imp` module removed in Python 3.12 for older test suites.
+*   `telnetlib.py` - compatibility shim restoring the legacy `telnetlib` module removed in Python 3.12.
 
 **sandbox/setup.py** Container initialization script executed inside `/workspace` when preparing a task sandbox. Inspects `pyproject.toml`, `setup.cfg`, or `requirements.txt`, resolves compatible offline wheels from `/wheels/`, performs an editable install (`pip install --no-index --find-links=/wheels -e .`), and creates a clean baseline Git commit so `git diff HEAD` captures only your agent's edits.
 
