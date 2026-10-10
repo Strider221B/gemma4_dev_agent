@@ -23,5 +23,5 @@ python env:
 source ~/python_envs/p312_kaggle/bin/activate
 
 ### PR Text:
-based on the changes you have made can you create a detailed PR description on what changed and why. Post the description on chat
+based on the changes you have made can you create a detailed PR description on what changed and why. Post the description on chat. Do not use git, just current chat history.
 
