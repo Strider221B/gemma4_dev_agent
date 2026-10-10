@@ -112,7 +112,7 @@ Public members/methods MUST appear BEFORE non-public (protected/private) members
 ## 11. Python Virtual Environment
 
 - Do NOT create a new Python virtual environment unless one does not already exist.
-- Activate with: `source ~/python_envs/p313_llm/bin/activate`.
+- Activate with: `source ~/python_envs/p312_kaggle/bin/activate`.
 - All dependency installations (`pip install`, `uv sync`) and script executions MUST run within the active virtual environment.
 
 ---

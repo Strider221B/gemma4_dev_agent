@@ -11,7 +11,7 @@
 
 - All previous epics are complete
 - `src/` package is ready for upload to Kaggle
-- Activate environment: `source ~/python_envs/p313_llm/bin/activate`
+- Activate environment: `source ~/python_envs/p312_kaggle/bin/activate`
 
 ---
 
@@ -248,7 +248,7 @@ This script verifies the full pipeline wiring works locally before uploading to 
 ## Task 13.5: Run Local Mock Test
 
 ```bash
-source ~/python_envs/p313_llm/bin/activate
+source ~/python_envs/p312_kaggle/bin/activate
 cd /home/somesh/git_repos/gemma4_dev_agent
 
 python notebooks/mock_notebook.py

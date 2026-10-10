@@ -10,7 +10,7 @@
 ## Pre-Requisites
 
 - Epic 11 is complete
-- Activate environment: `source ~/python_envs/p313_llm/bin/activate`
+- Activate environment: `source ~/python_envs/p312_kaggle/bin/activate`
 
 ---
 
@@ -124,7 +124,7 @@ Create a skill document that teaches the agent:
 Create a validation script or use `ConstraintValidator` to verify:
 
 ```bash
-source ~/python_envs/p313_llm/bin/activate
+source ~/python_envs/p312_kaggle/bin/activate
 cd /home/somesh/git_repos/gemma4_dev_agent
 
 # Verify all YAML files parse correctly

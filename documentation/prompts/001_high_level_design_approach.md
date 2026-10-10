@@ -98,4 +98,4 @@ The design must explicitly map out the following:
 
 ### Local Python Env:
 Python env:
-source ~/python_envs/p313_llm/bin/activate
+source ~/python_envs/p312_kaggle/bin/activate

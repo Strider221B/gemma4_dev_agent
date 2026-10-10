@@ -10,7 +10,7 @@
 ## Pre-Requisites
 
 - Epic 6 is complete
-- Activate environment: `source ~/python_envs/p313_llm/bin/activate`
+- Activate environment: `source ~/python_envs/p312_kaggle/bin/activate`
 - Training dependencies (Unsloth, TRL, PEFT) only available on Kaggle — local tests must mock these
 
 ---
@@ -182,7 +182,7 @@ def __init__(
 ## Task 7.7: Run CI
 
 ```bash
-source ~/python_envs/p313_llm/bin/activate
+source ~/python_envs/p312_kaggle/bin/activate
 cd /home/somesh/git_repos/gemma4_dev_agent
 
 ruff check src/ tests/

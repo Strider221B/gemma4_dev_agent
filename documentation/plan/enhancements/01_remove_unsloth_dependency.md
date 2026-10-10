@@ -9,7 +9,7 @@
 
 ## Pre-Requisites
 
-- Activate environment: `source ~/python_envs/p313_llm/bin/activate`
+- Activate environment: `source ~/python_envs/p312_kaggle/bin/activate`
 - Read design document: `documentation/design/enhancements/01_remove_unsloth_dependency.md`
 
 ---
@@ -31,7 +31,7 @@
 
 **Verification:**
 ```bash
-source ~/python_envs/p313_llm/bin/activate
+source ~/python_envs/p312_kaggle/bin/activate
 cd /home/somesh/git_repos/gemma4_dev_agent
 pip install -e ".[dev]"
 ```
@@ -327,7 +327,7 @@ Replace `patch.dict("sys.modules", {"unsloth": mock_unsloth, ...})` with:
 ## Task 1.6: Run CI
 
 ```bash
-source ~/python_envs/p313_llm/bin/activate
+source ~/python_envs/p312_kaggle/bin/activate
 cd /home/somesh/git_repos/gemma4_dev_agent
 
 # Stage 1: Lint

@@ -10,7 +10,7 @@
 ## Pre-Requisites
 
 - Epics 2 and 3 are complete
-- Activate environment: `source ~/python_envs/p313_llm/bin/activate`
+- Activate environment: `source ~/python_envs/p312_kaggle/bin/activate`
 
 ---
 
@@ -168,7 +168,7 @@ def __init__(self, token_counter: TokenCounter) -> None:
 ## Task 4.5: Run CI
 
 ```bash
-source ~/python_envs/p313_llm/bin/activate
+source ~/python_envs/p312_kaggle/bin/activate
 cd /home/somesh/git_repos/gemma4_dev_agent
 
 ruff check src/ tests/

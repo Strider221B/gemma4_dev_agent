@@ -10,7 +10,7 @@
 ## Pre-Requisites
 
 - Epic 9 is complete (CV Evaluator available for adversarial runs)
-- Activate environment: `source ~/python_envs/p313_llm/bin/activate`
+- Activate environment: `source ~/python_envs/p312_kaggle/bin/activate`
 
 ---
 
@@ -176,7 +176,7 @@ Create the initial registry file at `/home/somesh/git_repos/gemma4_dev_agent/con
 ## Task 10.6: Run CI
 
 ```bash
-source ~/python_envs/p313_llm/bin/activate
+source ~/python_envs/p312_kaggle/bin/activate
 cd /home/somesh/git_repos/gemma4_dev_agent
 
 ruff check src/ tests/

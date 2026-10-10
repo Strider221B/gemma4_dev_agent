@@ -85,7 +85,7 @@ Resolve the fatal `ValueError: Target module Gemma4ClippableLinear(...) is not s
 
 ### Phase 6: Verification and CI Pipeline Validation
 
-- **Environment**: `source ~/python_envs/p313_llm/bin/activate`
+- **Environment**: `source ~/python_envs/p312_kaggle/bin/activate`
 - **Checks**:
   1. `ruff check ./src ./tests` (Zero errors, line length 100).
   2. `mypy ./src` (Strict mode, zero errors).

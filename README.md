@@ -78,17 +78,17 @@ gemma4_dev_agent/
 
 ### Prerequisites
 - Linux OS (Ubuntu 22.04+ or WSL2 recommended)
-- Python 3.13+
+- Python 3.12+
 - `uv` (recommended) or standard `pip`
 
 ### Step 1: Activate Environment
 ```bash
 # Using the preconfigured virtual environment:
-source ~/python_envs/p313_llm/bin/activate
+source ~/python_envs/p312_kaggle/bin/activate
 
 # Or create a new virtual environment using uv:
-uv venv ~/python_envs/p313_llm --python 3.13
-source ~/python_envs/p313_llm/bin/activate
+uv venv ~/python_envs/p312_kaggle --python 3.12
+source ~/python_envs/p312_kaggle/bin/activate
 ```
 
 ### Step 2: Install in Editable Mode
@@ -166,7 +166,7 @@ You can use `VersionManager` or the Kaggle CLI directly:
 kaggle datasets create -p kaggle_staging/ --dir-mode zip
 
 # Or bump version and push new release:
-kaggle datasets version -p kaggle_staging/ --dir-mode zip -m "v0.1.0: update pipeline and training notebook"
+kaggle datasets version -p kaggle_staging/ --dir-mode zip -m ""
 ```
 
 ---

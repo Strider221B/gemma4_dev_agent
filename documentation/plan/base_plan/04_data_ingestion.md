@@ -10,7 +10,7 @@
 ## Pre-Requisites
 
 - Epic 2 is complete (all data models exist)
-- Activate environment: `source ~/python_envs/p313_llm/bin/activate`
+- Activate environment: `source ~/python_envs/p312_kaggle/bin/activate`
 
 ---
 
@@ -147,7 +147,7 @@
 ## Task 3.5: Run CI
 
 ```bash
-source ~/python_envs/p313_llm/bin/activate
+source ~/python_envs/p312_kaggle/bin/activate
 cd /home/somesh/git_repos/gemma4_dev_agent
 
 ruff check src/ tests/

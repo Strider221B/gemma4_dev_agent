@@ -10,7 +10,7 @@
 ## Pre-Requisites
 
 ```bash
-source ~/python_envs/p313_llm/bin/activate
+source ~/python_envs/p312_kaggle/bin/activate
 cd /home/somesh/git_repos/gemma4_dev_agent
 ```
 
@@ -95,7 +95,7 @@ build-backend = "setuptools.backends._legacy:_Backend"
 name = "swegemma-agent"
 version = "0.1.0"
 description = "Post-training pipeline for gemma-4-31b-it-qat-w4a16-ct as an autonomous SWE agent"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
     "pyyaml>=6.0",
     "pydantic>=2.0",
@@ -128,7 +128,7 @@ include = ["src*"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py313"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I"]
@@ -207,7 +207,7 @@ import pytest
 ## Task 0.6: Install Package in Editable Mode
 
 ```bash
-source ~/python_envs/p313_llm/bin/activate
+source ~/python_envs/p312_kaggle/bin/activate
 cd /home/somesh/git_repos/gemma4_dev_agent
 pip install -e ".[dev]"
 ```
@@ -217,7 +217,7 @@ pip install -e ".[dev]"
 ## Task 0.7: Install Linting/Type-Checking Tools
 
 ```bash
-source ~/python_envs/p313_llm/bin/activate
+source ~/python_envs/p312_kaggle/bin/activate
 pip install ruff mypy pytest pytest-cov pytest-mock pydantic
 ```
 
@@ -228,7 +228,7 @@ pip install ruff mypy pytest pytest-cov pytest-mock pydantic
 Run these commands and confirm zero errors:
 
 ```bash
-source ~/python_envs/p313_llm/bin/activate
+source ~/python_envs/p312_kaggle/bin/activate
 cd /home/somesh/git_repos/gemma4_dev_agent
 
 # Should pass with no files to check yet
