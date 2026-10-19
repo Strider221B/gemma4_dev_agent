@@ -28,6 +28,7 @@
 | 03 | [RL Training](detailed/03_rl_training.md) | GRPO/DPO implementations, multi-signal reward model, preference pair generation |
 | 04 | [CV Evaluator](detailed/04_cv_evaluator.md) | Full CV pipeline, budget simulation, report generation, actionable recommendations |
 | 05 | [Peer Solution Protocol](detailed/05_peer_solution_protocol.md) | 4-step adversarial validation, leakage detection, bootstrap significance, technique isolation |
+| 06 | [Local Model Verification](detailed/06_local_model_verification.md) | Local test harness with Gemma 4 E2B QAT W4A16, 7-stage verification, Issue #37 guardrails |
 
 ---
 

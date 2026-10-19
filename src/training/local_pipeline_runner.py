@@ -18,6 +18,8 @@ from src.deployment.constraint_validator import ConstraintValidator
 from src.deployment.submission_packager import SubmissionPackager
 from src.training.checkpoint_manager import CheckpointManager
 from src.training.curriculum_scheduler import CurriculumScheduler
+from src.training.local_model_smoke_tester import LocalModelSmokeTester
+from src.training.model_verification_runner import ModelVerificationRunner
 from src.training.sft_trainer import SFTTrainerPipeline
 from src.training.surrogate_model_factory import SurrogateModelFactory
 from src.utils.environment_detector import EnvironmentDetector
@@ -30,6 +32,7 @@ class LocalPipelineRunner:
     _MODE_SMOKE: ClassVar[str] = "smoke"
     _MODE_MOCK: ClassVar[str] = "mock"
     _MODE_FULL: ClassVar[str] = "full"
+    _MODE_LOCAL_MODEL: ClassVar[str] = "local_model"
     _RUN_VERSION: ClassVar[str] = "v0.1.0-local"
     _ADAPTER_NAME: ClassVar[str] = "coder_lora"
     _DEFAULT_CONFIG_PATH: ClassVar[str] = "configs/sft_config.yaml"
@@ -61,6 +64,7 @@ class LocalPipelineRunner:
         self,
         env_detector: EnvironmentDetector | None = None,
         work_dir: str | None = None,
+        verification_runner: ModelVerificationRunner | None = None,
     ) -> None:
         """Initialize LocalPipelineRunner with optional environment detector and work directory."""
         self._env: EnvironmentDetector = env_detector or EnvironmentDetector()
@@ -68,6 +72,7 @@ class LocalPipelineRunner:
         self._surrogate_factory: SurrogateModelFactory = SurrogateModelFactory()
         self._validator: ConstraintValidator = ConstraintValidator()
         self._packager: SubmissionPackager = SubmissionPackager(self._validator)
+        self._verification_runner: ModelVerificationRunner | None = verification_runner
 
     @classmethod
     def main(cls, argv: list[str] | None = None) -> int:
@@ -75,7 +80,12 @@ class LocalPipelineRunner:
         parser = argparse.ArgumentParser(description="SweGemma Local Pipeline Runner")
         parser.add_argument(
             "--mode",
-            choices=[cls._MODE_SMOKE, cls._MODE_MOCK, cls._MODE_FULL],
+            choices=[
+                cls._MODE_SMOKE,
+                cls._MODE_MOCK,
+                cls._MODE_FULL,
+                cls._MODE_LOCAL_MODEL,
+            ],
             default=cls._MODE_SMOKE,
             help="Pipeline execution mode (default: smoke)",
         )
@@ -94,7 +104,7 @@ class LocalPipelineRunner:
         """Dispatch pipeline execution based on specified mode.
 
         Args:
-            mode: Pipeline mode ('smoke', 'mock', or 'full').
+            mode: Pipeline mode ('smoke', 'mock', 'local_model', or 'full').
 
         Returns:
             Dictionary containing run summary and artifact paths.
@@ -103,9 +113,16 @@ class LocalPipelineRunner:
             return self.run_smoke()
         if mode == self._MODE_MOCK:
             return self.run_mock()
+        if mode == self._MODE_LOCAL_MODEL:
+            return self.run_local_model()
         if mode == self._MODE_FULL:
             return self._run_full()
         raise ValueError(f"Unknown execution mode: {mode}")
+
+    def run_local_model(self) -> dict[str, object]:
+        """Execute verification workflow using local model smoke tester."""
+        runner = self._verification_runner or LocalModelSmokeTester(work_dir=self._work_dir)
+        return runner.run_verification()
 
     def run_smoke(self) -> dict[str, object]:
         """Execute real dataset build, SFT training, and packaging with surrogate model."""

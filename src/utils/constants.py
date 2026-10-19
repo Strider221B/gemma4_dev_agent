@@ -7,6 +7,8 @@ MODEL_NAME: str = "google/gemma-4-31b-it-qat-w4a16-ct"
 KAGGLE_MODEL_PATH: str = (
     "/kaggle/input/models/google/gemma-4/other/gemma-4-31b-it-qat-w4a16-ct/2"
 )
+LOCAL_TEST_MODEL_NAME: str = "google/gemma-4-e2b-it-qat-w4a16-ct"
+LOCAL_TEST_MODEL_SLUG: str = "gemma-4-e2b-it-qat-w4a16-ct"
 
 # Submission constraints
 MAX_SUBMISSION_SIZE_BYTES: int = 3_221_225_472  # 3 GiB
