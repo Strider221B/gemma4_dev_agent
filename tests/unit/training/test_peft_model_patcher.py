@@ -110,6 +110,28 @@ class TestPEFTModelPatcher:
         result = patcher.patch_model(object())
         assert result is not None
 
+    def test_issue37_quantized_forward_accesses_weight_without_error(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify Issue #37 guardrail: accessing .weight on patched PEFT layer succeeds."""
+        mock_linear_cls = self._create_dummy_lora_class()
+        mock_module = MagicMock()
+        mock_module.Linear = mock_linear_cls
+        monkeypatch.setitem(sys.modules, self._KEY_PEFT_LAYER, mock_module)
+
+        patcher = PEFTModelPatcher()
+        patcher.patch_peft_lora_class()
+
+        instance = mock_linear_cls()
+        instance.base_layer = MagicMock()
+        instance.base_layer.weight = self._SAMPLE_WEIGHT
+
+        def simulated_quantized_forward(layer: object) -> object:
+            return getattr(layer, "weight")
+
+        weight_val = simulated_quantized_forward(instance)
+        assert weight_val == self._SAMPLE_WEIGHT
+
     def _create_dummy_lora_class(self) -> type:
         """Create a mock LoRA Linear class for property attachment testing."""
 

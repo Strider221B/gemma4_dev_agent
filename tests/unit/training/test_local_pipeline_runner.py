@@ -21,6 +21,7 @@ class TestLocalPipelineRunner:
     _MODE_SMOKE: ClassVar[str] = "smoke"
     _MODE_MOCK: ClassVar[str] = "mock"
     _MODE_FULL: ClassVar[str] = "full"
+    _MODE_LOCAL_MODEL: ClassVar[str] = "local_model"
     _MODE_INVALID: ClassVar[str] = "invalid_mode"
     _STATUS_KEY: ClassVar[str] = "status"
     _STATUS_SUCCESS: ClassVar[str] = "success"
@@ -57,6 +58,28 @@ class TestLocalPipelineRunner:
             result = runner.run(mode=self._MODE_MOCK)
             assert result[self._STATUS_KEY] == self._STATUS_SUCCESS
             mock_mock.assert_called_once()
+
+    def test_run_dispatches_local_model_mode(self) -> None:
+        """Verify run dispatches to run_local_model when mode is local_model."""
+        runner = LocalPipelineRunner(work_dir=self._CUSTOM_WORK_DIR)
+        mock_ret = {self._STATUS_KEY: self._STATUS_SUCCESS}
+        with patch.object(runner, "run_local_model", return_value=mock_ret) as mock_local:
+            result = runner.run(mode=self._MODE_LOCAL_MODEL)
+            assert result[self._STATUS_KEY] == self._STATUS_SUCCESS
+            mock_local.assert_called_once()
+
+    def test_run_local_model_uses_injected_verification_runner(self) -> None:
+        """Verify run_local_model delegates directly to injected ModelVerificationRunner."""
+        from unittest.mock import MagicMock
+
+        mock_runner = MagicMock()
+        mock_runner.run_verification.return_value = {self._STATUS_KEY: self._STATUS_SUCCESS}
+        runner = LocalPipelineRunner(
+            work_dir=self._CUSTOM_WORK_DIR, verification_runner=mock_runner
+        )
+        result = runner.run_local_model()
+        assert result[self._STATUS_KEY] == self._STATUS_SUCCESS
+        mock_runner.run_verification.assert_called_once()
 
     def test_run_unknown_mode_raises_value_error(self) -> None:
         """Verify run raises ValueError on unsupported mode identifier."""

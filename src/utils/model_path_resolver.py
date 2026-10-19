@@ -5,22 +5,40 @@ from __future__ import annotations
 import os
 from typing import ClassVar
 
-from src.utils.constants import KAGGLE_MODEL_PATH, MODEL_NAME
+from src.utils.constants import (
+    KAGGLE_MODEL_PATH,
+    LOCAL_TEST_MODEL_NAME,
+    LOCAL_TEST_MODEL_SLUG,
+    MODEL_NAME,
+)
 
 
 class ModelPathResolver:
     """Resolves model identifiers to local filesystem paths or hub identifiers."""
 
     _COMPETITION_MODEL_SLUG: ClassVar[str] = "gemma-4-31b-it-qat-w4a16-ct"
+    _LOCAL_TEST_MODEL_SLUG: ClassVar[str] = LOCAL_TEST_MODEL_SLUG
     _ENV_MODEL_PATH: ClassVar[str] = "MODEL_PATH"
     _ENV_GEMMA_PATH: ClassVar[str] = "GEMMA_MODEL_PATH"
+    _ENV_LOCAL_MODEL_PATH: ClassVar[str] = "LOCAL_MODEL_PATH"
+    _ENV_GEMMA_E2B_PATH: ClassVar[str] = "GEMMA_E2B_MODEL_PATH"
     _CANDIDATE_PATHS: ClassVar[tuple[str, ...]] = (
         KAGGLE_MODEL_PATH,
         "/kaggle/input/models/google/gemma-4/other/gemma-4-31b-it-qat-w4a16-ct",
     )
+    _LOCAL_CANDIDATE_PATHS: ClassVar[tuple[str, ...]] = (
+        "models/gemma-4-e2b-it-qat-w4a16-ct",
+        "~/.cache/huggingface/hub/models--google--gemma-4-e2b-it-qat-w4a16-ct",
+    )
 
     def __init__(self) -> None:
         """Initialize ModelPathResolver."""
+
+    @classmethod
+    def has_local_model(cls, model_name_or_path: str) -> bool:
+        """Check if resolved model path exists locally as a directory."""
+        resolved = cls.resolve(model_name_or_path)
+        return os.path.isdir(os.path.expanduser(resolved))
 
     @classmethod
     def resolve(cls, model_name_or_path: str) -> str:
@@ -34,32 +52,55 @@ class ModelPathResolver:
         """
         if not model_name_or_path:
             return cls._find_fallback_path()
-        if os.path.exists(model_name_or_path):
-            return model_name_or_path
-        env_resolved = cls._check_env_paths()
+        expanded = os.path.expanduser(model_name_or_path)
+        if os.path.exists(expanded):
+            return expanded
+        env_resolved = cls._check_env_paths(model_name_or_path)
         if env_resolved:
             return env_resolved
-        if cls._is_competition_model(model_name_or_path):
-            candidate = cls._find_existing_candidate()
-            if candidate:
-                return candidate
+        candidate = cls._find_candidate_for_model(model_name_or_path)
+        if candidate:
+            return candidate
         return model_name_or_path
 
     @classmethod
-    def _check_env_paths(cls) -> str | None:
+    def _check_env_paths(cls, identifier: str = "") -> str | None:
         """Check environment variables for locally mounted model paths."""
-        for env_var in (cls._ENV_MODEL_PATH, cls._ENV_GEMMA_PATH):
+        env_vars = (
+            (cls._ENV_LOCAL_MODEL_PATH, cls._ENV_GEMMA_E2B_PATH, cls._ENV_MODEL_PATH)
+            if cls._is_local_test_model(identifier)
+            else (cls._ENV_MODEL_PATH, cls._ENV_GEMMA_PATH)
+        )
+        for env_var in env_vars:
             env_val = os.environ.get(env_var)
-            if env_val and os.path.exists(env_val):
+            if env_val and os.path.exists(os.path.expanduser(env_val)):
                 return env_val
+        return None
+
+    @classmethod
+    def _find_candidate_for_model(cls, identifier: str) -> str | None:
+        """Find existing candidate path matching identifier type."""
+        if cls._is_local_test_model(identifier):
+            return cls._find_existing_local_candidate()
+        if cls._is_competition_model(identifier):
+            return cls._find_existing_candidate()
         return None
 
     @classmethod
     def _find_existing_candidate(cls) -> str | None:
         """Find first existing candidate path from known Kaggle mount locations."""
         for candidate in cls._CANDIDATE_PATHS:
-            if os.path.exists(candidate):
+            if os.path.exists(os.path.expanduser(candidate)):
                 return candidate
+        return None
+
+    @classmethod
+    def _find_existing_local_candidate(cls) -> str | None:
+        """Find first existing candidate path from local test model locations."""
+        for candidate in cls._LOCAL_CANDIDATE_PATHS:
+            expanded = os.path.expanduser(candidate)
+            if os.path.exists(expanded):
+                return expanded
         return None
 
     @classmethod
@@ -72,3 +113,13 @@ class ModelPathResolver:
     def _is_competition_model(cls, identifier: str) -> bool:
         """Check whether identifier matches standard competition model variants."""
         return identifier in (MODEL_NAME, cls._COMPETITION_MODEL_SLUG)
+
+    @classmethod
+    def _is_local_test_model(cls, identifier: str) -> bool:
+        """Check whether identifier matches local test model variants."""
+        return identifier in (LOCAL_TEST_MODEL_NAME, cls._LOCAL_TEST_MODEL_SLUG)
+
+    @classmethod
+    def _is_supported_model(cls, identifier: str) -> bool:
+        """Check whether identifier matches either competition or local test model."""
+        return cls._is_competition_model(identifier) or cls._is_local_test_model(identifier)
