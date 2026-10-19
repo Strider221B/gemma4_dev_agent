@@ -123,9 +123,9 @@ class LocalModelSmokeTester(ModelVerificationRunner):
 
     def _build_quantization_config(self, resolved_path: str) -> object | None:
         """Inspect model config and construct dequantize config if compressed-tensors."""
-        from transformers import AutoConfig
-
         try:
+            from transformers import AutoConfig
+
             hf_config = AutoConfig.from_pretrained(resolved_path, trust_remote_code=True)
             quant_cfg = getattr(hf_config, self._KEY_QUANT_CONFIG, None)
             if quant_cfg is not None and self._is_compressed_tensors(quant_cfg):
@@ -218,16 +218,13 @@ class LocalModelSmokeTester(ModelVerificationRunner):
 
     def _resolve_model_device(self, model: object) -> str | None:
         """Extract torch device identifier string from model parameters if available."""
-        import torch
-
         param_fn = getattr(model, "parameters", None)
         if callable(param_fn):
             try:
                 first_param = next(param_fn(), None)
                 if first_param is not None and hasattr(first_param, "device"):
                     dev = getattr(first_param, "device")
-                    if isinstance(dev, (torch.device, str)):
-                        return str(dev)
+                    return str(dev) if dev is not None else None
             except (StopIteration, TypeError):
                 return None
         return None

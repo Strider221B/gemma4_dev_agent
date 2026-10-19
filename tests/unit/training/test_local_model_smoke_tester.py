@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import sys
 import tempfile
-from typing import ClassVar
+from typing import Any, ClassVar
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -28,6 +29,15 @@ class TestLocalModelSmokeTester:
     _NO_LOGITS_MSG: ClassVar[str] = "Model outputs do not contain logits or loss"
     _ARG_MODEL_NAME: ClassVar[str] = "--model-name"
     _ARG_WORK_DIR: ClassVar[str] = "--work-dir"
+
+    @pytest.fixture(autouse=True)
+    def mock_dependencies(self, monkeypatch: pytest.MonkeyPatch) -> dict[str, MagicMock]:
+        """Set up mocked torch, transformers, and peft modules for unit tests."""
+        mocks = self._build_mock_objects()
+        monkeypatch.setitem(sys.modules, "torch", mocks["torch"])
+        monkeypatch.setitem(sys.modules, "transformers", mocks["transformers"])
+        monkeypatch.setitem(sys.modules, "peft", mocks["peft"])
+        return mocks
 
     def test_implements_model_verification_runner_protocol(self) -> None:
         """Verify LocalModelSmokeTester satisfies ModelVerificationRunner protocol."""
@@ -278,3 +288,50 @@ class TestLocalModelSmokeTester:
             assert tok == mock_tok_load.return_value
             mock_model_load.assert_called_once()
             mock_tok_load.assert_called_once()
+
+    def _create_dummy_compressed_config(self) -> type:
+        """Create a mock CompressedTensorsConfig class with dequantize attribute."""
+        def init_fn(target_self: Any, **kwargs: object) -> None:
+            target_self.dequantize = kwargs.get("dequantize", False)
+            for key, val in kwargs.items():
+                setattr(target_self, key, val)
+
+        return type("CompressedTensorsConfig", (), {"__init__": init_fn})
+
+    def _create_mock_device_type(self) -> type:
+        """Create a mock torch device class returning name on str()."""
+        def init_fn(target_self: Any, name: str) -> None:
+            target_self._name = name
+
+        def str_fn(target_self: Any) -> str:
+            return str(target_self._name)
+
+        return type("MockDevice", (), {"__init__": init_fn, "__str__": str_fn})
+
+    def _build_mock_objects(self) -> dict[str, MagicMock]:
+        """Construct mock instances for external training libraries."""
+        mock_peft = MagicMock()
+        mock_peft.LoraConfig = MagicMock()
+        mock_peft.get_peft_model = MagicMock()
+
+        mock_transformers = MagicMock()
+        mock_transformers.AutoConfig = MagicMock()
+        mock_transformers.AutoModelForCausalLM = MagicMock()
+        mock_transformers.AutoTokenizer = MagicMock()
+        mock_transformers.CompressedTensorsConfig = self._create_dummy_compressed_config()
+
+        mock_torch = MagicMock()
+        mock_torch.device = self._create_mock_device_type()
+        mock_torch.full = MagicMock(return_value=MagicMock())
+        mock_torch.ones = MagicMock(return_value=MagicMock())
+        mock_torch.long = "long"
+        mock_torch.float32 = "float32"
+        mock_torch.bfloat16 = "bfloat16"
+        mock_torch.cuda = MagicMock()
+        mock_torch.cuda.is_available.return_value = False
+
+        return {
+            "peft": mock_peft,
+            "transformers": mock_transformers,
+            "torch": mock_torch,
+        }
