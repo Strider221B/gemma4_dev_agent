@@ -123,6 +123,68 @@ mypy src/
 pytest tests/ -v --cov=src --cov-report=term-missing
 ```
 
+### 3. Execution Pathways for Real Model Verification
+
+To prevent remote runtime defects on Kaggle (such as [Issue #37](https://github.com/Strider221B/gemma4_dev_agent/issues/37) where `AttributeError: 'Linear' object has no attribute 'weight'` crashed SFT training), the repository provides a local test harness using Google's smaller quantized model:
+`google/gemma-4-e2b-it-qat-w4a16-ct` (~2B parameter QAT W4A16 Mixture of Experts model).
+
+> **Architectural Guardrail & Git Hygiene**:
+> - **Syntax Only**: E2B is a Mixture of Experts (MoE) model, unlike the production 31B dense model. It is used **strictly to verify syntax, model loading, `compressed-tensors` dequantize lifecycle hooks, PEFT LoRA wrapping, forward/backward execution, and adapter saving**.
+> - **Never Checked into Git**: Model binaries and checkpoints are ignored in `.gitignore` and must **never** be committed to GitHub.
+> - **Unit Tests vs Real Model**: Standard unit tests in `tests/unit/` use test doubles/mocks with zero physical weight dependencies. Real model verification is executed via the two pathways below:
+
+#### Pathway A: Direct CLI Runner (On-Demand Verification)
+Runs the end-to-end 7-stage verification workflow (config load, tokenizer special tokens check, PEFT LoRA attachment, 1-step forward pass, 1-step backward pass, adapter saving, and telemetry report) in ~12 seconds:
+
+```bash
+# 1. Activate your virtual environment
+source ~/python_envs/p312_kaggle/bin/activate
+
+# 2. Run local model verification (auto-resolves from cache or local path)
+python -m src.training.local_pipeline_runner --mode local_model
+```
+
+Or execute the standalone smoke tester with an optional local path override:
+```bash
+# Direct smoke tester:
+python -m src.training.local_model_smoke_tester
+
+# With custom weights directory:
+LOCAL_MODEL_PATH=/path/to/gemma-4-e2b-it-qat-w4a16-ct python -m src.training.local_pipeline_runner --mode local_model
+```
+
+**Output**: Emits structured JSON confirming all pipeline stages passed:
+```json
+{
+  "status": "success",
+  "model_name": "google/gemma-4-e2b-it-qat-w4a16-ct",
+  "resolved_path": "/home/user/.cache/huggingface/hub/models--google--gemma-4-e2b-it-qat-w4a16-ct",
+  "forward_passed": true,
+  "backward_passed": true,
+  "adapter_saved": true,
+  "elapsed_seconds": 12.4
+}
+```
+
+#### Pathway B: Dedicated Integration Test (Pytest with Real Weights)
+A real end-to-end integration test executing `LocalModelSmokeTester` with zero mocks:
+```bash
+source ~/python_envs/p312_kaggle/bin/activate
+pytest tests/integration/test_local_model_smoke.py -v -s
+```
+- **Conditional Skip**: Automatically skipped in CI if model weights are not present locally.
+- **When Present**: Runs the actual forward pass on quantized layers, verifying that `quantized_forward` executes without `AttributeError`.
+
+#### (Optional) One-Time Model Weight Download
+To cache the model locally for verification without checking it into git:
+```bash
+python -c "
+from transformers import AutoModelForCausalLM, AutoTokenizer
+AutoModelForCausalLM.from_pretrained('google/gemma-4-e2b-it-qat-w4a16-ct')
+AutoTokenizer.from_pretrained('google/gemma-4-e2b-it-qat-w4a16-ct')
+"
+```
+
 ---
 
 ## 6. Kaggle Staging & Dataset Synchronization
