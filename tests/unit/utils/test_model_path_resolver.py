@@ -135,3 +135,45 @@ class TestModelPathResolver:
         assert ModelPathResolver._is_supported_model(self._LOCAL_TEST_NAME) is True
         assert ModelPathResolver._is_supported_model(self._LOCAL_TEST_SLUG) is True
         assert ModelPathResolver._is_supported_model(self._CUSTOM_REPO_ID) is False
+
+    def test_resolve_local_test_model_resolves_to_snapshot_when_in_hf_cache(self) -> None:
+        """Verify local test model resolves to snapshot directory when present in HF cache."""
+        hub_rel = "~/.cache/huggingface/hub/models--google--gemma-4-e2b-it-qat-w4a16-ct"
+        hub_cache = os.path.expanduser(hub_rel)
+        snapshot_dir = os.path.join(hub_cache, "snapshots", "mock_hash_123")
+        with patch.dict(os.environ, {}, clear=True):
+            with (
+                patch("os.path.exists") as mock_exists,
+                patch("os.path.isdir") as mock_isdir,
+                patch("os.listdir", return_value=["mock_hash_123"]),
+                patch("os.path.isfile") as mock_isfile,
+            ):
+                mock_exists.side_effect = lambda p: p == hub_cache
+                valid_dirs = (os.path.join(hub_cache, "snapshots"), snapshot_dir)
+                mock_isdir.side_effect = lambda p: p in valid_dirs
+                mock_isfile.side_effect = lambda p: p == os.path.join(snapshot_dir, "config.json")
+                result = ModelPathResolver.resolve(self._LOCAL_TEST_NAME)
+                assert result == snapshot_dir
+
+    def test_resolve_hf_snapshot_returns_none_when_snapshots_not_dir(self) -> None:
+        """Verify _resolve_hf_snapshot returns None when snapshots path is not a directory."""
+        with patch("os.path.isdir", return_value=False):
+            assert ModelPathResolver._resolve_hf_snapshot("/mock/hub/dir") is None
+
+    def test_resolve_hf_snapshot_returns_none_when_no_config_json(self) -> None:
+        """Verify _resolve_hf_snapshot returns None when snapshot directory lacks config.json."""
+        with (
+            patch("os.path.isdir", return_value=True),
+            patch("os.listdir", return_value=["snapshot_1"]),
+            patch("os.path.isfile", return_value=False),
+        ):
+            assert ModelPathResolver._resolve_hf_snapshot("/mock/hub/dir") is None
+
+    def test_resolve_hf_snapshot_handles_os_error_gracefully(self) -> None:
+        """Verify _resolve_hf_snapshot catches OSError during listdir and returns None."""
+        with (
+            patch("os.path.isdir", return_value=True),
+            patch("os.listdir", side_effect=OSError("Disk error")),
+        ):
+            assert ModelPathResolver._resolve_hf_snapshot("/mock/hub/dir") is None
+

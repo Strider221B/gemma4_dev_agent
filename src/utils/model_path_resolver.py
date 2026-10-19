@@ -22,6 +22,8 @@ class ModelPathResolver:
     _ENV_GEMMA_PATH: ClassVar[str] = "GEMMA_MODEL_PATH"
     _ENV_LOCAL_MODEL_PATH: ClassVar[str] = "LOCAL_MODEL_PATH"
     _ENV_GEMMA_E2B_PATH: ClassVar[str] = "GEMMA_E2B_MODEL_PATH"
+    _CONFIG_FILE: ClassVar[str] = "config.json"
+    _SUBDIR_SNAPSHOTS: ClassVar[str] = "snapshots"
     _CANDIDATE_PATHS: ClassVar[tuple[str, ...]] = (
         KAGGLE_MODEL_PATH,
         "/kaggle/input/models/google/gemma-4/other/gemma-4-31b-it-qat-w4a16-ct",
@@ -99,8 +101,14 @@ class ModelPathResolver:
         """Find first existing candidate path from local test model locations."""
         for candidate in cls._LOCAL_CANDIDATE_PATHS:
             expanded = os.path.expanduser(candidate)
-            if os.path.exists(expanded):
-                return expanded
+            if not os.path.exists(expanded):
+                continue
+            if os.path.isdir(os.path.join(expanded, cls._SUBDIR_SNAPSHOTS)):
+                snapshot = cls._resolve_hf_snapshot(expanded)
+                if snapshot:
+                    return snapshot
+                continue
+            return expanded
         return None
 
     @classmethod
@@ -123,3 +131,19 @@ class ModelPathResolver:
     def _is_supported_model(cls, identifier: str) -> bool:
         """Check whether identifier matches either competition or local test model."""
         return cls._is_competition_model(identifier) or cls._is_local_test_model(identifier)
+
+    @classmethod
+    def _resolve_hf_snapshot(cls, hub_dir: str) -> str | None:
+        """Find latest snapshot directory containing config.json within HF hub directory."""
+        snapshots_dir = os.path.join(hub_dir, cls._SUBDIR_SNAPSHOTS)
+        if not os.path.isdir(snapshots_dir):
+            return None
+        try:
+            entries = sorted(os.listdir(snapshots_dir), reverse=True)
+            for entry in entries:
+                snapshot_path = os.path.join(snapshots_dir, entry)
+                if os.path.isfile(os.path.join(snapshot_path, cls._CONFIG_FILE)):
+                    return snapshot_path
+        except OSError:
+            return None
+        return None

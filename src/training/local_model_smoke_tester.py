@@ -40,6 +40,11 @@ class LocalModelSmokeTester(ModelVerificationRunner):
     _DTYPE_FLOAT32: ClassVar[str] = "float32"
     _DEVICE_AUTO: ClassVar[str] = "auto"
     _DEVICE_CPU: ClassVar[str] = "cpu"
+    _MIN_GPU_MEMORY_BYTES: ClassVar[int] = 16 * (1024**3)
+    _ENV_DEVICE_MAP: ClassVar[str] = "LOCAL_MODEL_DEVICE_MAP"
+    _KEY_DTYPE: ClassVar[str] = "dtype"
+    _MODULE_LANGUAGE_MODEL: ClassVar[str] = "language_model"
+    _PREFIX_DOT: ClassVar[str] = "."
     _DEFAULT_LORA_R: ClassVar[int] = 8
     _DEFAULT_LORA_ALPHA: ClassVar[int] = 16
     _DUMMY_SEQ_LEN: ClassVar[int] = 16
@@ -110,7 +115,7 @@ class LocalModelSmokeTester(ModelVerificationRunner):
 
         self._patcher.patch_peft_lora_class()
         target_list = list(self._TARGET_MODULES)
-        resolved_targets = self._target_resolver.resolve(model, target_list)
+        resolved_targets = self._resolve_target_modules(model, target_list)
         lora_cfg = LoraConfig(
             r=self._DEFAULT_LORA_R,
             lora_alpha=self._DEFAULT_LORA_ALPHA,
@@ -162,6 +167,22 @@ class LocalModelSmokeTester(ModelVerificationRunner):
             return CompressedTensorsConfig(**cfg_dict)
         return CompressedTensorsConfig(dequantize=True)
 
+    def _determine_device_map(self) -> str:
+        """Select device map with CPU fallback for low VRAM to prevent meta tensors."""
+        env_override = os.environ.get(self._ENV_DEVICE_MAP)
+        if env_override:
+            return env_override
+        import torch
+
+        if torch.cuda.is_available():
+            try:
+                gpu_mem = torch.cuda.get_device_properties(0).total_memory
+                if gpu_mem >= self._MIN_GPU_MEMORY_BYTES:
+                    return self._DEVICE_AUTO
+            except Exception:
+                pass
+        return self._DEVICE_CPU
+
     def _execute_backward_pass(self, outputs: object) -> bool:
         """Compute dummy loss and backpropagate gradients to verify backward pass."""
         loss = getattr(outputs, "loss", None)
@@ -205,10 +226,10 @@ class LocalModelSmokeTester(ModelVerificationRunner):
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
         quant_config = self._build_quantization_config(resolved_path)
-        is_cuda = torch.cuda.is_available()
+        chosen_device = self._determine_device_map()
         load_kwargs: dict[str, object] = {
-            "device_map": self._DEVICE_AUTO if is_cuda else self._DEVICE_CPU,
-            "torch_dtype": torch.bfloat16 if is_cuda else torch.float32,
+            "device_map": chosen_device,
+            self._KEY_DTYPE: torch.bfloat16,
         }
         if quant_config is not None:
             load_kwargs[self._KEY_QUANT_CONFIG] = quant_config
@@ -232,6 +253,23 @@ class LocalModelSmokeTester(ModelVerificationRunner):
     def _resolve_model_path(self) -> str:
         """Resolve model identifier to local path using ModelPathResolver."""
         return ModelPathResolver.resolve(self._model_name)
+
+    def _resolve_target_modules(self, model: object, target_list: list[str]) -> list[str]:
+        """Resolve LoRA target modules prioritizing language_model sub-modules if present."""
+        named_modules_fn = getattr(model, "named_modules", None)
+        if callable(named_modules_fn):
+            try:
+                lm_targets = [
+                    name
+                    for name, _ in named_modules_fn()
+                    if self._MODULE_LANGUAGE_MODEL in name
+                    and any(name.endswith(f"{self._PREFIX_DOT}{t}") for t in target_list)
+                ]
+                if lm_targets:
+                    return lm_targets
+            except (TypeError, ValueError):
+                pass
+        return self._target_resolver.resolve(model, target_list)
 
     def _save_adapter_checkpoint(self, model: object) -> str:
         """Persist adapter weights to test directory and verify saved artifacts."""
