@@ -490,3 +490,21 @@ data:
   embeddings_dir: "/kaggle/input/gemma-4-developer-agent/published/embeddings"
   snapshots_dir: "/kaggle/input/gemma-4-developer-agent/published/snapshots"
 ```
+
+---
+
+## 7. Model Path Resolution & Pre-Flight Verification
+
+Before launching resource-intensive training on remote Kaggle multi-GPU clusters, the pipeline utilizes `ModelPathResolver` to resolve model identifiers and supports fast pre-flight smoke testing via `LocalModelSmokeTester`:
+
+### 7.1 ModelPathResolver
+- Decouples pipeline configuration from environment-specific directory mounts.
+- Resolves paths with priority: explicit filesystem path -> environment variables (`MODEL_PATH`, `GEMMA_MODEL_PATH`, `LOCAL_MODEL_PATH`, `GEMMA_E2B_MODEL_PATH`) -> standard Kaggle mounts -> Hugging Face Hub identifiers.
+
+### 7.2 Local Pre-Flight Verification (Issue #37 Guardrail)
+- Prevents recurring runtime crashes during training (e.g., `AttributeError: 'Linear' object has no attribute 'weight'` under `compressed-tensors`) by validating quantization lifecycle hooks and LoRA delegation prior to remote dispatch.
+- Executed via `LocalPipelineRunner`:
+  ```bash
+  python -m src.training.local_pipeline_runner --mode local_model
+  ```
+- For complete architectural details on the 7-stage verification workflow, PEFT class patching, and MoE scope guardrails, see [Detailed Design 06 — Local Model Verification](06_local_model_verification.md).
