@@ -56,6 +56,24 @@ class TestLocalModelSmokeTester:
             assert resolved == self._MOCK_RESOLVED_PATH
             mock_resolve.assert_called_once_with(self._CUSTOM_MODEL_NAME)
 
+    def test_resolve_model_device_returns_device_when_present(self) -> None:
+        """Verify _resolve_model_device extracts device string or torch.device."""
+        import torch
+
+        mock_param = MagicMock()
+        mock_param.device = torch.device("cpu")
+        mock_model = MagicMock()
+        mock_model.parameters.return_value = iter([mock_param])
+
+        tester = LocalModelSmokeTester()
+        dev = tester._resolve_model_device(mock_model)
+        assert dev == "cpu"
+
+    def test_resolve_model_device_returns_none_when_no_parameters(self) -> None:
+        """Verify _resolve_model_device returns None when model lacks parameters."""
+        tester = LocalModelSmokeTester()
+        assert tester._resolve_model_device(object()) is None
+
     def test_verify_tokenizer_tokens_succeeds_when_all_tokens_present(self) -> None:
         """Verify _verify_tokenizer_tokens completes when all required tokens exist in vocab."""
         mock_tokenizer = MagicMock()
@@ -201,3 +219,62 @@ class TestLocalModelSmokeTester:
                 exit_code = LocalModelSmokeTester.main(args)
                 assert exit_code == 0
                 mock_run.assert_called_once()
+
+    def test_is_compressed_tensors_evaluates_dict_and_object(self) -> None:
+        """Verify _is_compressed_tensors identifies compressed-tensors method."""
+        tester = LocalModelSmokeTester()
+        assert tester._is_compressed_tensors({"quant_method": "compressed-tensors"}) is True
+        assert tester._is_compressed_tensors({"quant_method": "bitsandbytes"}) is False
+        mock_obj = MagicMock()
+        mock_obj.quant_method = "compressed-tensors"
+        assert tester._is_compressed_tensors(mock_obj) is True
+
+    def test_create_dequantize_config_handles_dict_to_dict_and_generic(self) -> None:
+        """Verify _create_dequantize_config sets dequantize=True across input types."""
+        tester = LocalModelSmokeTester()
+        cfg_dict = {"format": "int4"}
+        res1 = tester._create_dequantize_config(cfg_dict)
+        assert getattr(res1, "dequantize", False) is True
+
+        mock_obj = MagicMock()
+        mock_obj.to_dict.return_value = {"format": "int4"}
+        res2 = tester._create_dequantize_config(mock_obj)
+        assert getattr(res2, "dequantize", False) is True
+
+        res3 = tester._create_dequantize_config(object())
+        assert getattr(res3, "dequantize", False) is True
+
+    def test_build_quantization_config_returns_config_when_compressed(self) -> None:
+        """Verify _build_quantization_config returns dequantize config for compressed models."""
+        tester = LocalModelSmokeTester()
+        mock_cfg = MagicMock()
+        mock_cfg.quantization_config = {"quant_method": "compressed-tensors"}
+        with patch("transformers.AutoConfig.from_pretrained", return_value=mock_cfg):
+            result = tester._build_quantization_config(self._MOCK_RESOLVED_PATH)
+            assert result is not None
+            assert getattr(result, "dequantize", False) is True
+
+    def test_build_quantization_config_returns_none_on_missing_or_error(self) -> None:
+        """Verify _build_quantization_config returns None when not compressed or error occurs."""
+        tester = LocalModelSmokeTester()
+        mock_cfg = MagicMock()
+        mock_cfg.quantization_config = None
+        with patch("transformers.AutoConfig.from_pretrained", return_value=mock_cfg):
+            assert tester._build_quantization_config(self._MOCK_RESOLVED_PATH) is None
+
+        with patch("transformers.AutoConfig.from_pretrained", side_effect=RuntimeError("load err")):
+            assert tester._build_quantization_config(self._MOCK_RESOLVED_PATH) is None
+
+    def test_load_model_and_tokenizer_invokes_hf_loaders(self) -> None:
+        """Verify _load_model_and_tokenizer calls AutoModel and AutoTokenizer loaders."""
+        tester = LocalModelSmokeTester()
+        with (
+            patch.object(tester, "_build_quantization_config", return_value=None),
+            patch("transformers.AutoModelForCausalLM.from_pretrained") as mock_model_load,
+            patch("transformers.AutoTokenizer.from_pretrained") as mock_tok_load,
+        ):
+            model, tok = tester._load_model_and_tokenizer(self._MOCK_RESOLVED_PATH)
+            assert model == mock_model_load.return_value
+            assert tok == mock_tok_load.return_value
+            mock_model_load.assert_called_once()
+            mock_tok_load.assert_called_once()

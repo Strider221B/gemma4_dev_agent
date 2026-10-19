@@ -7,7 +7,7 @@ import json
 import os
 import tempfile
 import time
-from typing import ClassVar
+from typing import Any, ClassVar, cast
 
 from src.training.lora_target_resolver import LoRATargetModuleResolver
 from src.training.model_verification_runner import ModelVerificationRunner
@@ -118,7 +118,7 @@ class LocalModelSmokeTester(ModelVerificationRunner):
             lora_dropout=0.0,
             task_type=self._TASK_TYPE_CAUSAL,
         )
-        peft_model = get_peft_model(model, lora_cfg)
+        peft_model = get_peft_model(cast(Any, model), lora_cfg)
         return self._patcher.patch_model(peft_model)
 
     def _build_quantization_config(self, resolved_path: str) -> object | None:
@@ -177,26 +177,27 @@ class LocalModelSmokeTester(ModelVerificationRunner):
 
     def _execute_forward_pass(self, model: object, tokenizer: object) -> object:
         """Execute a forward pass with dummy tokens to verify PEFT/quantization hooks."""
+        if not callable(model):
+            raise TypeError("Model object is not callable for forward pass execution")
         import torch
 
-        pad_id = getattr(tokenizer, "pad_token_id", 0) or 0
+        pad_token = getattr(tokenizer, "pad_token_id", 0)
+        pad_id = int(pad_token) if isinstance(pad_token, (int, float)) else 0
         input_ids = torch.full((1, self._DUMMY_SEQ_LEN), pad_id, dtype=torch.long)
         attention_mask = torch.ones((1, self._DUMMY_SEQ_LEN), dtype=torch.long)
-        if hasattr(model, "parameters"):
-            device = next(model.parameters()).device
+        device = self._resolve_model_device(model)
+        if device is not None:
             input_ids = input_ids.to(device)
             attention_mask = attention_mask.to(device)
-        if callable(model):
-            return model(input_ids=input_ids, attention_mask=attention_mask)
-        raise TypeError("Model object is not callable for forward pass execution")
+        return model(input_ids=input_ids, attention_mask=attention_mask)
 
     def _is_compressed_tensors(self, quant_cfg: object) -> bool:
         """Check whether quantization configuration specifies compressed-tensors."""
         if isinstance(quant_cfg, dict):
             method = quant_cfg.get(self._KEY_QUANT_METHOD, "")
-            return method == self._QUANT_METHOD_COMPRESSED
+            return bool(method == self._QUANT_METHOD_COMPRESSED)
         method_attr = getattr(quant_cfg, self._KEY_QUANT_METHOD, "")
-        return method_attr == self._QUANT_METHOD_COMPRESSED
+        return bool(method_attr == self._QUANT_METHOD_COMPRESSED)
 
     def _load_model_and_tokenizer(self, resolved_path: str) -> tuple[object, object]:
         """Load causal language model and tokenizer with dequantization config if applicable."""
@@ -214,6 +215,22 @@ class LocalModelSmokeTester(ModelVerificationRunner):
         model = AutoModelForCausalLM.from_pretrained(resolved_path, **load_kwargs)
         tokenizer = AutoTokenizer.from_pretrained(resolved_path, trust_remote_code=True)
         return model, tokenizer
+
+    def _resolve_model_device(self, model: object) -> str | None:
+        """Extract torch device identifier string from model parameters if available."""
+        import torch
+
+        param_fn = getattr(model, "parameters", None)
+        if callable(param_fn):
+            try:
+                first_param = next(param_fn(), None)
+                if first_param is not None and hasattr(first_param, "device"):
+                    dev = getattr(first_param, "device")
+                    if isinstance(dev, (torch.device, str)):
+                        return str(dev)
+            except (StopIteration, TypeError):
+                return None
+        return None
 
     def _resolve_model_path(self) -> str:
         """Resolve model identifier to local path using ModelPathResolver."""
