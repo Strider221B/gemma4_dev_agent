@@ -289,6 +289,68 @@ class TestLocalModelSmokeTester:
             mock_model_load.assert_called_once()
             mock_tok_load.assert_called_once()
 
+    def test_determine_device_map_returns_env_override(self) -> None:
+        """Verify _determine_device_map prioritizes LOCAL_MODEL_DEVICE_MAP env override."""
+        tester = LocalModelSmokeTester()
+        with patch.dict("os.environ", {"LOCAL_MODEL_DEVICE_MAP": "cpu"}):
+            assert tester._determine_device_map() == "cpu"
+
+    def test_determine_device_map_returns_auto_when_vram_sufficient(self) -> None:
+        """Verify _determine_device_map selects auto when GPU VRAM >= 16GB threshold."""
+        import torch
+
+        tester = LocalModelSmokeTester()
+        mock_props = MagicMock()
+        mock_props.total_memory = 24 * (1024**3)
+        with patch.dict("os.environ", {}, clear=True):
+            with (
+                patch.object(torch.cuda, "is_available", return_value=True),
+                patch.object(torch.cuda, "get_device_properties", return_value=mock_props),
+            ):
+                assert tester._determine_device_map() == "auto"
+
+    def test_determine_device_map_returns_cpu_when_vram_insufficient(self) -> None:
+        """Verify _determine_device_map falls back to cpu when GPU VRAM < 16GB."""
+        import torch
+
+        tester = LocalModelSmokeTester()
+        mock_props = MagicMock()
+        mock_props.total_memory = 6 * (1024**3)
+        with patch.dict("os.environ", {}, clear=True):
+            with (
+                patch.object(torch.cuda, "is_available", return_value=True),
+                patch.object(torch.cuda, "get_device_properties", return_value=mock_props),
+            ):
+                assert tester._determine_device_map() == "cpu"
+
+    def test_resolve_target_modules_prioritizes_language_model_submodules(self) -> None:
+        """Verify _resolve_target_modules returns language_model module paths when present."""
+        tester = LocalModelSmokeTester()
+        mock_model = MagicMock()
+        mock_model.named_modules.return_value = [
+            ("model.vision_tower.encoder.layers.0.self_attn.q_proj", MagicMock()),
+            ("model.language_model.layers.0.self_attn.q_proj", MagicMock()),
+            ("model.language_model.layers.0.self_attn.v_proj", MagicMock()),
+        ]
+        targets = tester._resolve_target_modules(mock_model, ["q_proj", "v_proj"])
+        assert targets == [
+            "model.language_model.layers.0.self_attn.q_proj",
+            "model.language_model.layers.0.self_attn.v_proj",
+        ]
+
+    def test_resolve_target_modules_falls_back_when_no_language_model(self) -> None:
+        """Verify _resolve_target_modules falls back to target resolver when no language_model."""
+        mock_resolver = MagicMock()
+        mock_resolver.resolve.return_value = ["q_proj", "v_proj"]
+        tester = LocalModelSmokeTester(target_resolver=mock_resolver)
+        mock_model = MagicMock()
+        mock_model.named_modules.return_value = [
+            ("model.layers.0.self_attn.q_proj", MagicMock()),
+        ]
+        targets = tester._resolve_target_modules(mock_model, ["q_proj", "v_proj"])
+        assert targets == ["q_proj", "v_proj"]
+        mock_resolver.resolve.assert_called_once()
+
     def _create_dummy_compressed_config(self) -> type:
         """Create a mock CompressedTensorsConfig class with dequantize attribute."""
         def init_fn(target_self: Any, **kwargs: object) -> None:
